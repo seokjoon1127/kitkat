@@ -1,0 +1,410 @@
+/* 타임라인 — 다크 편집기 스타일 */
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #16161c;
+  color: #d7d7e0;
+  font-size: 12px;
+  user-select: none;
+  border-top: 1px solid #26262e;
+}
+
+.timeline-empty {
+  align-items: center;
+  justify-content: center;
+  color: #6b6b78;
+  padding: 24px;
+}
+
+.tl-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  scrollbar-color: #3a3a46 #16161c;
+}
+
+.tl-content {
+  position: relative;
+}
+
+.tl-row {
+  display: flex;
+  position: relative;
+}
+
+/* ---------- 눈금자 ---------- */
+
+.tl-ruler-row {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #1b1b22;
+  border-bottom: 1px solid #2a2a33;
+}
+
+.tl-corner {
+  position: sticky;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: #1b1b22;
+  border-right: 1px solid #2a2a33;
+  flex: none;
+}
+
+.tl-zoom-label {
+  color: #7a7a88;
+  font-size: 10px;
+  min-width: 46px;
+  text-align: center;
+}
+
+.tl-ruler {
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  overflow: hidden;
+}
+
+.tl-tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  height: 6px;
+  background: #3a3a46;
+  pointer-events: none;
+}
+
+.tl-tick-major {
+  height: 11px;
+  background: #55556a;
+}
+
+.tl-tick-label {
+  position: absolute;
+  bottom: 12px;
+  left: 3px;
+  font-size: 10px;
+  color: #8a8a9a;
+  white-space: nowrap;
+}
+
+.tl-playhead-handle {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #ff4d6d;
+  pointer-events: none;
+}
+
+.tl-playhead {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  background: #ff4d6d;
+  z-index: 15;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(255, 77, 109, 0.6);
+}
+
+/* ---------- 비트 마커 ---------- */
+
+/* 트랙 전체를 가로지르는 세로선 (눈금자 뒤로 가려진다) */
+.tl-beat {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  background: rgba(140, 220, 255, 0.28);
+  z-index: 12;
+  pointer-events: none;
+}
+
+/* 눈금자 안쪽 짧은 표시 */
+.tl-beat-tick {
+  position: absolute;
+  top: 2px;
+  width: 1px;
+  height: 8px;
+  background: #6fd0ff;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* ---------- 트랙 헤더 ---------- */
+
+.tl-header {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  background: #1e1e26;
+  border-right: 1px solid #2a2a33;
+  border-bottom: 1px solid #23232b;
+}
+
+.tl-header-top,
+.tl-header-bottom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tl-kind {
+  flex: none;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #2c2c38;
+  color: #a0a0b4;
+}
+
+.tl-kind-video { background: #22384a; color: #7cc4ff; }
+.tl-kind-audio { background: #1f3c2c; color: #7ed39b; }
+.tl-kind-text { background: #3d3323; color: #f0c674; }
+.tl-kind-overlay { background: #38263f; color: #d49bf0; }
+
+.tl-track-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c4c4d2;
+  font-size: 11px;
+}
+
+.tl-btn {
+  flex: none;
+  background: #26262e;
+  color: #9d9dae;
+  border: 1px solid #33333e;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.tl-btn:hover {
+  background: #33333e;
+  color: #e2e2ea;
+}
+
+.tl-btn-on {
+  background: #4453d8;
+  border-color: #5a68e8;
+  color: #ffffff;
+}
+
+.tl-btn-danger:hover {
+  background: #6e2430;
+  border-color: #a03040;
+  color: #ffb0bc;
+}
+
+.tl-volume {
+  flex: 1;
+  min-width: 40px;
+  height: 12px;
+  accent-color: #4453d8;
+}
+
+/* ---------- 레인·클립 ---------- */
+
+.tl-lane {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  background:
+    repeating-linear-gradient(to right, transparent 0, transparent 59px, #1d1d24 59px, #1d1d24 60px),
+    #191920;
+  border-bottom: 1px solid #23232b;
+}
+
+.tl-lane-hidden { opacity: 0.45; }
+.tl-lane-locked {
+  background:
+    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255, 255, 255, 0.02) 10px 20px),
+    #191920;
+}
+
+.tl-clip {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: grab;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #2c2c38;
+}
+
+.tl-clip:active { cursor: grabbing; }
+
+.tl-clip-video { background: linear-gradient(180deg, #27435c, #1e3346); }
+.tl-clip-image { background: linear-gradient(180deg, #3c5c27, #2c451e); }
+.tl-clip-audio { background: linear-gradient(180deg, #1f3c2c, #172c20); }
+.tl-clip-text { background: linear-gradient(180deg, #4a3d22, #382e18); }
+
+.tl-clip-selected {
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 10px rgba(255, 255, 255, 0.15);
+}
+
+.tl-clip-dimmed { opacity: 0.35; }
+
+.tl-clip-invalid {
+  border-color: #ff4d4d;
+  box-shadow: 0 0 0 1px #ff4d4d;
+}
+
+.tl-clip-locked { cursor: default; }
+
+.tl-clip-thumb {
+  position: absolute;
+  inset: 0;
+  background-size: auto 100%;
+  background-repeat: repeat-x;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.tl-waveform {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  pointer-events: none;
+}
+
+.tl-clip-label {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.tl-clip-kindmark {
+  flex: none;
+  font-weight: 700;
+  font-size: 10px;
+  color: #f0c674;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  padding: 0 3px;
+}
+
+.tl-clip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #eaeaf2;
+}
+
+.tl-clip-badge {
+  flex: none;
+  font-size: 9px;
+  color: #ffd580;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* 정지화면·반복 클립 표시 */
+.tl-clip-mark {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  color: #0e0f12;
+  background: #8cdcff;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.tl-clip-freeze { background: linear-gradient(180deg, #2f4a5c, #223744); }
+.tl-clip-loop { background: linear-gradient(180deg, #43355c, #322745); }
+
+.tl-trim-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.tl-trim-start { left: 0; border-radius: 6px 0 0 6px; }
+.tl-trim-end { right: 0; border-radius: 0 6px 6px 0; }
+
+.tl-clip:hover .tl-trim-handle,
+.tl-clip-selected .tl-trim-handle {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.tl-ghost {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  border: 1px dashed #7cc4ff;
+  background: rgba(124, 196, 255, 0.18);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.tl-ghost-invalid {
+  border-color: #ff4d4d;
+  background: rgba(255, 77, 77, 0.22);
+}
+
+/* ---------- 트랙 추가 ---------- */
+
+.tl-addrow {
+  min-height: 34px;
+}
+
+.tl-addtrack {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  border-bottom: none;
+}
+
+.tl-addtrack-label {
+  color: #7a7a88;
+  font-size: 10px;
+  flex: none;
+}

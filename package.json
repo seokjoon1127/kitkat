@@ -1,0 +1,22 @@
+{
+  "name": "kitkat",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @kitkat/schema --if-present && npm run build -w @kitkat/engine --if-present && npm run build -w @kitkat/media --if-present && npm run build -w @kitkat/ai --if-present && npm run build -w @kitkat/renderer --if-present && npm run build -w @kitkat/server --if-present && npm run build -w @kitkat/mcp --if-present && npm run build -w @kitkat/ui --if-present",
+    "test": "npm run test -w @kitkat/schema --if-present && npm run test -w @kitkat/engine --if-present && npm run test -w @kitkat/media --if-present && npm run test -w @kitkat/ai --if-present && npm run test -w @kitkat/renderer --if-present && npm run test -w @kitkat/server --if-present && npm run test -w @kitkat/mcp --if-present && npm run test -w @kitkat/ui --if-present",
+    "dev": "npm run dev -w @kitkat/server",
+    "start": "npm run start -w @kitkat/server",
+    "samples": "node scripts/make-sample-media.mjs",
+    "demo": "node scripts/demo-edit.mjs"
+  },
+  "devDependencies": {
+    "opentype.js": "^2.0.0"
+  }
+}

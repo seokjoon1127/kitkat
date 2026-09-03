@@ -1,0 +1,66 @@
+[
+  {
+    "severity": "minor",
+    "file": "C:\\Users\\david\\project\\kitkat\\packages\\ui\\src\\state.ts",
+    "issue": "undo/redo(206~224행)가 restoreDoc으로 문서 전체를 스냅샷으로 교체하므로, 스냅샷 이후 서버 잡이 써넣은 에셋 메타데이터(updateAsset의 proxySrc·waveformSrc·thumbSrc·reversedSrc)와 원격(에이전트) 변경까지 함께 지워진다. 특히 proxySrc/reversedSrc는 임포트 시점에만 생성되므로 되살아날 계기가 없다.",
+    "scenario": "비디오 임포트 직후(프록시 잡 완료 전) 사용자가 편집 1건 → undoStack 스냅샷에는 proxySrc 없음. 프록시 잡 완료로 proxySrc 반영 → 사용자가 Ctrl+Z → restoreDoc이 proxySrc를 영구 삭제 → 이후 미리보기가 원본 풀해상도를 계속 스트리밍(체감 렉). 같은 창구로 setReversed 직후의 undo가 reversedSrc를 지우면 reversed=true인 클립이 렌더에서 정방향으로 재생된다. 자막 잡 완료 직후의 undo는 방금 생성된 자막 TextClip 전부를 삭제한다.",
+    "fix": "restoreDoc 시 assets의 파생 필드(proxySrc 등)는 현재 doc 값을 보존해 병합하거나, undo 스택에 스냅샷 대신 역명령(inverse command)을 쌓는 방식 검토. 최소한 파생 필드 병합만이라도.",
+    "lens": "concurrency"
+  },
+  {
+    "severity": "minor",
+    "file": "C:\\Users\\david\\project\\kitkat\\packages\\ai\\src\\index.ts",
+    "issue": "ensurePython(49~75행)에 동시 호출 가드가 없다. captions 라우트(render.ts 97행)가 HTTP 핸들러에서 직접 호출하므로, venv 미준비 상태에서 자막 요청 2건이 동시에 오면 같은 .venv에 `pip install --upgrade faster-whisper`가 두 개 겹쳐 돈다.",
+    "scenario": "최초 설치 전 에이전트가 kitkat_auto_caption을 두 에셋에 연속 호출(또는 사람+에이전트 동시 요청) → pip 두 프로세스가 같은 site-packages에 동시 쓰기 → Windows 파일 잠금으로 한쪽 실패 또는 반쯤 설치된 패키지 → 이후 transcribe가 ModuleNotFoundError 계열로 계속 실패해 501/에러 잡 반복.",
+    "fix": "모듈 수준 Promise 캐시(ensurePython 진행 중이면 같은 Promise 반환)로 직렬화.",
+    "lens": "concurrency"
+  },
+  {
+    "severity": "minor",
+    "file": "C:\\Users\\david\\project\\kitkat\\packages\\server\\src\\store.ts",
+    "issue": "save(94~100행)가 디스크 쓰기 성공 전에 cache.set을 먼저 한다. rename이 EPERM 재시도 3회를 초과해 최종 실패하면 메모리 revision은 올라갔는데 파일은 이전 상태이고, applyBatch는 throw로 브로드캐스트를 건너뛰어 500을 반환한다.",
+    "scenario": "백신/백업이 json 파일을 ~2초 이상 잡은 상태에서 명령 POST → 500. 클라이언트가 같은 baseRevision N으로 재시도하면 캐시는 이미 N+1이라 409가 나고(에러였던 편집이 doc에 들어있는 채로), 다른 구독자들은 브로드캐스트를 못 받아 다음 명령(N+2)에서야 불연속 resync. 서버 재시작 시엔 디스크의 옛 revision으로 되돌아가 메모리에서만 존재하던 편집이 사라진다.",
+    "fix": "rename 성공 후에 cache.set을 수행(실패 시 메모리·디스크 일관 유지).",
+    "lens": "concurrency"
+  },
+  {
+    "severity": "minor",
+    "file": "C:\\Users\\david\\project\\kitkat\\packages\\server\\src\\routes\\projects.ts",
+    "issue": "DELETE /api/projects/:id(44~53행)가 store.remove를 프로젝트 뮤텍스(withLock) 없이 실행한다. 진행 중인 applyBatch의 save(writeFile await 중)와 겹치면 rm 뒤에 rename이 완료돼 삭제한 프로젝트 파일이 되살아난다.",
+    "scenario": "프록시/자막 잡이 updateAsset applyBatch로 파일을 쓰는 도중 사용자가 프로젝트 삭제 → rm이 먼저, tmp→rename이 나중에 실행 → data/projects/<id>.json이 revision+1 상태로 재생성 → GET /api/projects 목록에 삭제했던 프로젝트가 다시 나타난다.",
+    "fix": "remove를 store.withLock(id, ...) 안에서 수행.",
+    "lens": "concurrency"
+  },
+  {
+    "severity": "minor",
+    "file": "packages/ui/src/components/Timeline.tsx",
+    "issue": "트랙 잠금(locked)이 드래그에만 적용된다. Delete 키(254행), Ctrl+D 복제(216행), 인스펙터의 updateClip/setClipSpeed/setKeyframes는 locked를 확인하지 않고, engine에도 locked 방어가 없어 잠근 트랙의 클립이 그대로 삭제·수정된다.",
+    "scenario": "트랙 헤더에서 [잠금]을 켠 뒤 그 트랙의 클립을 클릭(선택은 잠금과 무관하게 됨)하고 Delete → 클립이 삭제된다. 인스펙터에서 불투명도를 바꿔도 그대로 적용된다.",
+    "fix": "선택/단축키/인스펙터 dispatch 전에 findClip으로 트랙 locked를 확인해 차단하거나, engine의 클립 변경 명령들이 locked 트랙에서 EngineError를 던지게 한다.",
+    "lens": "contracts"
+  },
+  {
+    "severity": "minor",
+    "file": "packages/server/src/routes/static.ts",
+    "issue": "/assets/* 정적 서빙 등록이 서버 기동 시 existsSync(assetsDir) 결과로 고정된다(25행). /p/:id의 index.html 존재 여부는 요청마다 확인하므로, 서버 기동 후에 UI를 빌드하면 index.html은 서빙되는데 그 안의 JS/CSS(/assets/*)는 404가 된다 — C3의 '미빌드 시 안내 HTML' 동작과 달리 안내도 없이 빈 화면.",
+    "scenario": "UI 미빌드 상태로 서버 기동 → npm run build -w @kitkat/ui 실행 → 브라우저에서 /p/:id 새로고침 → index.html은 로드되지만 /assets/index-*.js가 404 → 편집기가 빈 화면으로 뜬다(서버 재시작 전까지).",
+    "fix": "/assets/* 를 요청 시점에 파일 존재를 확인하는 핸들러로 서빙하거나, 항상 등록하고 root 부재를 허용하는 옵션을 쓴다.",
+    "lens": "contracts"
+  },
+  {
+    "severity": "minor",
+    "file": "packages/renderer/src/composition/background.tsx",
+    "issue": "배경 blur 경로의 OffthreadVideo가 isRendering 구분 없이 playbackRate를 Math.min(16, clip.speed)로 클램프한다(76행). C4는 클램프를 Player(미리보기) 경로에만 두라고 규정하며, 본편 클립(clips.tsx)은 렌더 시 원래 속도를 쓴다.",
+    "scenario": "최하단 비디오 클립의 speed를 20으로 설정하고 배경을 blur로 두면, 최종 렌더에서 본편은 20배속으로 정확히 재생되지만 그 뒤 블러 배경은 16배속으로 재생되어 배경과 본편의 프레임 내용이 어긋난다.",
+    "fix": "clips.tsx와 동일하게 getRemotionEnvironment().isRendering이면 클램프 없이 clip.speed를 사용한다.",
+    "lens": "contracts"
+  },
+  {
+    "severity": "minor",
+    "file": "packages/ui/src/components/MediaPanel.tsx",
+    "issue": "MediaRecorder가 만드는 webm은 컨테이너에 duration 헤더가 없어 ffprobe가 duration을 N/A로 보고하는 경우가 많고, 그때 asset.duration이 undefined가 되어 buildAddClip이 녹음 길이와 무관하게 3000ms(DEFAULT_IMAGE_MS) 클립(in:0, out:3000)을 만든다(27행).",
+    "scenario": "[녹음]으로 20초 보이스오버를 녹음해 업로드 → 에셋에 길이가 표시되지 않음 → 더블클릭 배치 시 3초짜리 오디오 클립만 생겨 뒤 17초가 잘리고, 트림 최대치 계산(trimRange)도 소스 제약 없이 동작한다.",
+    "fix": "duration이 없는 오디오/비디오는 서버에서 재인코딩(webm→wav 등)하거나 ffprobe -count_packets류로 길이를 산출해 addAsset 전에 채운다.",
+    "lens": "contracts"
+  }
+]

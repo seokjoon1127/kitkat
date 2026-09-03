@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>F14 bench3</title>
+<pre id="out">running…</pre>
+<script type="module">
+// F14 실측 v3 — **사람이 보는 것** 을 잰다.
+// 타임라인을 실제로 끌 때처럼 매 화면 주기(rAF)마다 재생 위치를 조금씩 옮기면서
+// 「그 순간 화면에 맞는 프레임이 있었는가」를 센다. 없으면 이전 프레임이 남아 «끊겨» 보인다.
+import { FrameProvider } from '/src/preview/decoder.ts';
+
+const log = (s) => { document.getElementById('out').textContent += '\n' + s; };
+const raf = () => new Promise((r) => requestAnimationFrame(r));
+
+/**
+ * @param stepMs 한 화면 주기마다 옮기는 소스 시각 (양수 = 앞으로, 음수 = 뒤로)
+ * @returns { ticks, stale, stalePct, firstHitMs } stale = 맞는 프레임이 없던 화면 수
+ */
+async function drag(src, startMs, stepMs, ticks, fps, useWebCodecs) {
+  const frameIntervalMs = 1000 / fps;
+  const provider = new FrameProvider({
+    webCodecs: useWebCodecs, elements: 2, cacheSize: 200,
+  });
+  const ask = (srcMs) => provider.frame({
+    key: 'drag', src, srcMs, frameIntervalMs, playing: false, rate: 1, muted: true, volume: 0,
+  });
+
+  // 시동: 첫 프레임이 나올 때까지 기다린다(이건 드래그 성능이 아니다)
+  const t0 = performance.now();
+  for (let i = 0; i < 600; i++) {
+    if (ask(startMs).exact) break;
+    await raf();
+  }
+  const firstHitMs = Math.round((performance.now() - t0) * 10) / 10;
+
+  let stale = 0;
+  let t = startMs;
+  const lat = [];
+  for (let i = 0; i < ticks; i++) {
+    t += stepMs;
+    const a0 = performance.now();
+    const r = ask(t);
+    lat.push(performance.now() - a0);
+    if (!(r.image && r.exact)) stale++;
+    await raf();
+  }
+  const stats = provider.debugStats();
+  provider.dispose();
+  const sorted = lat.slice().sort((a, b) => a - b);
+  return {
+    ticks, stale,
+    stalePct: Math.round((stale / ticks) * 1000) / 10,
+    firstHitMs,
+    askMedianMs: Math.round(sorted[Math.floor(sorted.length / 2)] * 100) / 100,
+    stats,
+  };
+}
+
+const CASES = [
+  ['프록시 GOP 기본 (540p60)', '/media/w8-f14/gtest/n95kzhiR45VuDLb1BdXJI.old.mp4', 60, 4800],
+  ['프록시 GOP 15 (540p60)', '/media/w8-f14/gtest/n95kzhiR45VuDLb1BdXJI.gplain.mp4', 60, 4800],
+  ['실제 프록시 (540p30)', '/media/proxies/05Za-VeBbHtGHMiFsSqRd.mp4', 30, 4800],
+];
+
+const out = [];
+for (const [label, src, fps, durMs] of CASES) {
+  const step = 1000 / fps; // 한 화면 주기에 한 프레임씩 — 사람이 천천히 끄는 속도
+  const row = { label, src, fps };
+  row.fwd_video = await drag(src, durMs * 0.05, step, 120, fps, false);
+  row.fwd_wc = await drag(src, durMs * 0.05, step, 120, fps, true);
+  row.back_video = await drag(src, durMs * 0.9, -step, 120, fps, false);
+  row.back_wc = await drag(src, durMs * 0.9, -step, 120, fps, true);
+  // 빠른 드래그 (한 화면에 4프레임씩) — 마우스를 휙 끌 때
+  row.fast_video = await drag(src, durMs * 0.05, step * 4, 60, fps, false);
+  row.fast_wc = await drag(src, durMs * 0.05, step * 4, 60, fps, true);
+  out.push(row);
+  log(label + ' 앞으로: <video> stale ' + row.fwd_video.stalePct + '% / WC ' + row.fwd_wc.stalePct + '%');
+}
+
+window.__F14_BENCH3 = { results: out, mem: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null };
+document.title = 'F14 bench3 DONE';
+</script>

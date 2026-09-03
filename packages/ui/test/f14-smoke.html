@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>F14 smoke</title><pre id="out">running…</pre>
+<script type="module">
+import { createWebCodecsSource } from '/src/preview/webcodecs.ts';
+const out = {};
+for (const [label, url, worker] of [['worker', '/media/derived/V6nanLFr0y_CX-Virn6V7.s1c6e6d0c.p.g15.mp4', true], ['inthread', '/media/derived/V6nanLFr0y_CX-Virn6V7.s1c6e6d0c.p.g15.mp4', false], ['worker-webm', '/media/proxies/4MK4-49vsrLhBMIgBd-Dz.g15.mp4', true]]) {
+  const t0 = performance.now();
+  const s = await createWebCodecsSource(url, { lookahead: 60, worker });
+  const r = { opened: !!s, openMs: Math.round(performance.now() - t0) };
+  if (s) {
+    r.frameMs = Math.round(s.frameIntervalMs * 100) / 100;
+    const ts = [500, 520, 3000, 2967, 100, 4900];
+    r.frames = [];
+    for (const t of ts) { const a = performance.now(); s.hint(t, t < 2000 && r.frames.length > 2 ? -1 : 1, 1); const f = await s.frameAt(t); r.frames.push(`${t}:${f ? f.displayWidth + 'x' + f.displayHeight : 'null'}@${Math.round(performance.now() - a)}ms`); }
+    await new Promise((r) => setTimeout(r, 800));
+    r.stats = s.stats();
+    s.close();
+    await new Promise((r) => setTimeout(r, 300));
+    r.after = s.stats();
+  }
+  out[label] = r;
+  document.getElementById('out').textContent = JSON.stringify(out, null, 1);
+}
+window.__F14_SMOKE = out; document.title = 'F14 smoke DONE';
+</script>

@@ -1,0 +1,796 @@
+/* 인스펙터 패널 — 다크 편집기 톤 */
+.inspector {
+  width: 320px;
+  min-width: 280px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #17171d;
+  color: #e7e7ee;
+  border-left: 1px solid #26262f;
+  font-size: 12px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.insp-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #b9bdd6;
+  border-bottom: 1px solid #26262f;
+  background: #1b1b22;
+  flex-shrink: 0;
+}
+
+.insp-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 28px;
+}
+.insp-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.insp-scroll::-webkit-scrollbar-thumb {
+  background: #2e2e3a;
+  border-radius: 4px;
+}
+.insp-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3a3a48;
+}
+
+.insp-section {
+  border-bottom: 1px solid #22222b;
+  padding: 10px 14px 14px;
+}
+.insp-section-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8f96ff;
+  letter-spacing: 0.6px;
+}
+.insp-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.insp-row {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+.insp-label {
+  color: #9a9aab;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.insp-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.insp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.insp-value {
+  color: #c9c9d6;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  min-width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.insp-static {
+  color: #c9c9d6;
+  font-variant-numeric: tabular-nums;
+}
+.insp-suffix {
+  color: #7d7d8d;
+  font-size: 11px;
+}
+.insp-empty {
+  color: #6d6d7d;
+  font-size: 11px;
+  margin: 6px 0;
+  text-align: center;
+}
+
+/* 슬라이더 */
+.insp-range {
+  flex: 1;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  background: #33333f;
+  outline: none;
+  cursor: pointer;
+}
+.insp-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8f96ff;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.insp-range::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+.insp-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8f96ff;
+  border: none;
+  cursor: pointer;
+}
+
+/* 입력류 */
+.insp-number,
+.insp-text,
+.insp-select,
+.insp-textarea {
+  background: #22222b;
+  border: 1px solid #30303c;
+  border-radius: 4px;
+  color: #e7e7ee;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+}
+.insp-number:focus,
+.insp-text:focus,
+.insp-select:focus,
+.insp-textarea:focus {
+  border-color: #8f96ff;
+  outline: none;
+}
+.insp-number {
+  width: 68px;
+}
+.insp-text {
+  flex: 1;
+  min-width: 0;
+}
+.insp-select {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.insp-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
+  line-height: 1.5;
+}
+.insp-color {
+  width: 28px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #30303c;
+  border-radius: 4px;
+  background: #22222b;
+  cursor: pointer;
+}
+.insp-check {
+  accent-color: #8f96ff;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* 버튼 */
+.insp-btn {
+  background: #2b2b36;
+  border: 1px solid #3a3a48;
+  color: #dcdce6;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.insp-btn:hover {
+  background: #343442;
+  border-color: #8f96ff;
+}
+.insp-del {
+  padding: 2px 7px;
+  color: #c88;
+}
+.insp-del:hover {
+  border-color: #d66;
+  color: #f99;
+}
+.insp-btn:disabled,
+.insp-btn:disabled:hover {
+  background: #22222b;
+  border-color: #2e2e3a;
+  color: #5c5c6b;
+  cursor: not-allowed;
+}
+
+/* 효과 카드 */
+.insp-add-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.insp-effect {
+  border: 1px solid #26262f;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #1b1b22;
+}
+.insp-effect-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #cfcfdd;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* 키프레임 테이블 */
+.insp-kf-head,
+.insp-kf-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 52px minmax(0, 1fr) 24px;
+  gap: 4px;
+  align-items: center;
+}
+.insp-kf-head {
+  color: #6d6d7d;
+  font-size: 10px;
+}
+.insp-kf-num {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── W5 ─────────────────────────────────────────────────────────────────── */
+
+/* 안내 문구 / 상태 배지 */
+.insp-note {
+  margin: 2px 0 0;
+  color: #7d7d8d;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.insp-badge {
+  margin: 2px 0 0;
+  padding: 4px 7px;
+  border: 1px solid #4a4326;
+  border-radius: 4px;
+  background: #2a2718;
+  color: #e6c86a;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.insp-badge-inline {
+  padding: 2px 6px;
+  margin: 0;
+}
+
+/* 채널 탭 (색조정 커브) */
+.insp-tabs {
+  display: flex;
+  gap: 4px;
+}
+.insp-tab {
+  flex: 1;
+  background: #22222b;
+  border: 1px solid #30303c;
+  border-radius: 4px;
+  color: #9a9aab;
+  padding: 3px 0;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.insp-tab:hover {
+  border-color: #8f96ff;
+}
+.insp-tab.is-active {
+  background: #2e2f52;
+  border-color: #8f96ff;
+  color: #e7e7ee;
+}
+.insp-tab.has-data::after {
+  content: '•';
+  margin-left: 4px;
+  color: #8f96ff;
+}
+
+/* 커브 에디터 */
+.insp-curve {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  display: block;
+  border-radius: 6px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.insp-curve-bg {
+  fill: #1b1b22;
+  stroke: #30303c;
+  stroke-width: 1;
+}
+.insp-curve-grid line {
+  stroke: #26262f;
+  stroke-width: 0.7;
+}
+.insp-curve-diag {
+  stroke: #2e2e3a;
+  stroke-width: 0.7;
+  stroke-dasharray: 3 3;
+}
+.insp-curve-line {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.insp-curve-dot {
+  stroke: #17171d;
+  stroke-width: 1;
+}
+.insp-curve-dot:hover {
+  stroke: #e7e7ee;
+}
+
+/* 속도 램프 */
+.insp-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.insp-preset {
+  padding: 4px 2px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.insp-ramp-head,
+.insp-ramp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px;
+  gap: 4px;
+  align-items: center;
+}
+.insp-ramp-head {
+  color: #6d6d7d;
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+/* 텍스트 템플릿 갤러리 — W8 F16 에서 90종이 되어 갈래 탭이 붙었다 */
+.insp-tpl-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.insp-tpl-tab {
+  padding: 3px 8px;
+  background: #1b1b22;
+  border: 1px solid #26262f;
+  border-radius: 999px;
+  color: #b9b9c6;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.insp-tpl-tab:hover {
+  border-color: #8f96ff;
+}
+.insp-tpl-tab-on {
+  background: #2b2b48;
+  border-color: #8f96ff;
+  color: #ececf5;
+}
+.insp-tpl-count {
+  opacity: 0.6;
+  font-size: 10px;
+}
+.insp-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.insp-tpl-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 4px;
+  background: #1b1b22;
+  border: 1px solid #26262f;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  font-family: inherit;
+}
+.insp-tpl-chip:hover {
+  border-color: #8f96ff;
+}
+.insp-tpl-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 4px;
+  /* 실제 자막처럼 보이도록 체커 배경 위에 그린다 */
+  background:
+    linear-gradient(45deg, #3a3a46 25%, transparent 25%, transparent 75%, #3a3a46 75%),
+    linear-gradient(45deg, #3a3a46 25%, #2a2a34 25%, #2a2a34 75%, #3a3a46 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 6px 6px;
+  overflow: hidden;
+}
+.insp-tpl-sample {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.insp-tpl-name {
+  color: #9a9aab;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* ── W8: 키프레임(F13) · 이징(F7) ──────────────────────────────────────── */
+
+/* 값 옆의 마름모 버튼 — ◇ 없음 / ◆ 여기 있음 / ◈ 다른 곳에 있음 / 회색 = 걸 수 없음 */
+.insp-kf-dot {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #5c5c6b;
+  cursor: pointer;
+}
+.insp-kf-dot:hover:not(:disabled) {
+  border-color: #8f96ff;
+  color: #e7e7ee;
+}
+.insp-kf-dot.is-on {
+  color: #8f96ff;
+}
+.insp-kf-dot.is-other {
+  color: #6a6ea8;
+}
+.insp-kf-dot.is-blocked {
+  color: #3a3a46;
+  cursor: not-allowed;
+}
+
+/* 경로별 그룹 */
+.insp-kf-group {
+  border: 1px solid #26262f;
+  border-radius: 6px;
+  padding: 6px 7px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #1b1b22;
+}
+.insp-kf-group-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #cfcfdd;
+}
+.insp-kf-fold {
+  width: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #8f96ff;
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.insp-kf-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.insp-kf-count {
+  color: #6d6d7d;
+  font-variant-numeric: tabular-nums;
+}
+.insp-kf-tag {
+  padding: 1px 5px;
+  border: 1px solid #4a4326;
+  border-radius: 3px;
+  background: #2a2718;
+  color: #e6c86a;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.insp-kf-tag.is-bad {
+  border-color: #5a2a2a;
+  background: #2e1b1b;
+  color: #f99;
+}
+
+/* 미니 타임라인 — 클립 길이를 가로로 편 한 줄 */
+.insp-kf-strip {
+  position: relative;
+  height: 16px;
+  border-radius: 3px;
+  background: #22222b;
+  border: 1px solid #2e2e3a;
+  touch-action: none;
+  cursor: pointer;
+}
+.insp-kf-mark {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -4px 0 0 -4px;
+  background: #8f96ff;
+  border: 1px solid #17171d;
+  transform: rotate(45deg);
+}
+.insp-kf-mark.is-drag {
+  background: #e7e7ee;
+}
+.insp-kf-head-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e0574f;
+}
+
+/* 표 행 — 시간 / 값 / 이징 / 곡선 / 삭제 */
+.insp-kf-row {
+  grid-template-columns: 56px 52px minmax(0, 1fr) 22px 22px;
+}
+.insp-kf-icon {
+  padding: 2px 0;
+  text-align: center;
+}
+
+/* 이징 편집기 */
+.insp-ease {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 2px;
+  padding: 7px;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  background: #1f1f2b;
+}
+.insp-ease-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.insp-ease-name {
+  color: #cfcfdd;
+  font-size: 11px;
+  font-weight: 600;
+}
+.insp-ease-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+}
+.insp-chip {
+  padding: 3px 2px;
+  background: #22222b;
+  border: 1px solid #30303c;
+  border-radius: 4px;
+  color: #9a9aab;
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.insp-chip:hover {
+  border-color: #8f96ff;
+}
+.insp-chip.is-active {
+  background: #2e2f52;
+  border-color: #8f96ff;
+  color: #e7e7ee;
+}
+.insp-ease-curve {
+  cursor: default;
+}
+.insp-curve-grid-line {
+  stroke: #26262f;
+  stroke-width: 0.7;
+}
+/* y=0 · y=1 기준선 — 이게 없으면 「1 을 넘었다」가 눈에 안 보인다 */
+.insp-ease-base {
+  stroke: #4a4a5e;
+  stroke-width: 0.8;
+}
+.insp-ease-tick {
+  fill: #6d6d7d;
+  font-size: 7px;
+  text-anchor: end;
+}
+.insp-ease-line {
+  stroke: #8f96ff;
+}
+.insp-ease-handle {
+  stroke: #4a4a6e;
+  stroke-width: 0.8;
+}
+.insp-ease-dot {
+  fill: #8f96ff;
+  cursor: grab;
+}
+
+/* ── W8 F4 컷 색 맞추기 · F5 HSL 세컨더리 ─────────────────────────────── */
+
+/* 클립 화면 위에서 영역을 그리거나 픽셀을 찍는 위젯 */
+.insp-frame-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.insp-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.insp-frame-label {
+  color: #7d7d8d;
+  font-size: 10px;
+}
+.insp-frame-box {
+  position: relative;
+  width: 100%;
+  border: 1px solid #30303c;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1b1b22;
+  cursor: crosshair;
+  touch-action: none;
+}
+.insp-frame-box.is-pick {
+  border-color: #8f96ff;
+}
+.insp-frame-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.insp-frame-rect {
+  position: absolute;
+  border: 1px solid #8f96ff;
+  background: rgba(143, 150, 255, 0.16);
+  pointer-events: none;
+}
+
+/* 여러 컷 선택 목록 */
+.insp-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid #2b2b36;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.insp-batch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #b9b9c6;
+  cursor: pointer;
+}
+
+/* 색 계열 칩 — 글자가 아니라 «그 계열의 실제 색» 으로 찾는다 */
+.insp-swatch-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+.insp-swatch-hues {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.insp-swatch-tones {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.insp-swatch {
+  position: relative;
+  border: 1px solid #30303c;
+  border-radius: 4px;
+  padding: 10px 2px 3px;
+  font-family: inherit;
+  font-size: 10px;
+  color: #14141a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.insp-swatch:hover {
+  border-color: #8f96ff;
+}
+.insp-swatch.is-active {
+  outline: 2px solid #8f96ff;
+  outline-offset: -2px;
+}
+.insp-swatch.has-data::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #17171d;
+}
+.insp-swatch-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid #30303c;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+.insp-bandrow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  width: 100%;
+}

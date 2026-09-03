@@ -1,0 +1,31 @@
+<!doctype html><meta charset="utf-8"><title>F14 provider</title><pre id="out">running…</pre>
+<script type="module">
+// 편집기와 같은 순서로 FrameProvider 를 쓴다: prewarm → 매 틱 frame() (한 프레임씩 앞으로).
+// 워커가 힌트를 받아 채우는지, 어느 틱부터 exact 가 나오는지 본다.
+import { FrameProvider } from '/src/preview/decoder.ts';
+const DERIVED = '/media/derived/V6nanLFr0y_CX-Virn6V7.s1c6e6d0c.p.g15.mp4';
+const STICKER = '/media/proxies/4MK4-49vsrLhBMIgBd-Dz.g15.mp4';
+const CLIPB = '/media/derived/sEPUF3A9L92RQDh5NpvMD.s34781492.p.g15.mp4';
+const log = (s) => { document.getElementById('out').textContent += '\n' + s; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const provider = new FrameProvider({ webCodecs: true });
+const t0 = performance.now();
+provider.prewarm([DERIVED, STICKER, CLIPB]);
+const ask = (src, srcMs) => provider.frame({ key: 'k' + src, src, srcMs, frameIntervalMs: 1000 / 30, playing: false, rate: 1, muted: true, volume: 0 });
+const out = { ticks: [] };
+let srcMs = 500;
+let stick = 0;
+for (let i = 0; i < 90; i++) {
+  const a = ask(DERIVED, srcMs);
+  const b = ask(STICKER, stick % 1001);
+  out.ticks.push({ i, t: Math.round(performance.now() - t0), srcMs, exact: a.exact, img: !!a.image, sExact: b.exact });
+  srcMs += 33; stick += 33;
+  await sleep(100);
+  if (i % 15 === 14) log(`t=${Math.round(performance.now() - t0)} ` + JSON.stringify(provider.debugStats()));
+}
+out.pattern = out.ticks.map((t) => (t.exact ? '.' : 'X')).join('');
+out.sticker = out.ticks.map((t) => (t.sExact ? '.' : 'X')).join('');
+out.stats = provider.debugStats();
+provider.dispose();
+window.__F14_PROVIDER = out; document.title = 'F14 provider DONE';
+</script>

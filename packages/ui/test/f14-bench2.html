@@ -1,0 +1,136 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>F14 bench2</title>
+<pre id="out">running…</pre>
+<script type="module">
+// F14 실측 v2 — rAF(16.7ms) 격자에 묻히지 않게 «디코드가 끝나는 시각» 을 직접 잰다.
+//  - 지금 경로: <video>.currentTime = t → seeked → createImageBitmap
+//  - WebCodecs: FrameSource.frameAt(t)
+// 세 가지 움직임을 따로 잰다: 임의 점프 / 앞으로 끌기 / 뒤로 끌기.
+import { createWebCodecsSource } from '/src/preview/webcodecs.ts';
+
+const out = [];
+const log = (s) => { document.getElementById('out').textContent += '\n' + s; };
+
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+}
+
+function summarize(list) {
+  const ok = list.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  if (ok.length === 0) return { n: list.length, fail: list.length };
+  const q = (p) => ok[Math.min(ok.length - 1, Math.floor(ok.length * p))];
+  const r = (v) => Math.round(v * 10) / 10;
+  return {
+    n: list.length, fail: list.length - ok.length,
+    median: r(q(0.5)), p90: r(q(0.9)), mean: r(ok.reduce((a, b) => a + b, 0) / ok.length),
+    max: r(ok[ok.length - 1]),
+  };
+}
+
+// ── 지금 경로 (decoder.ts 의 stillFrame 과 같은 동작) ────────────────────────
+function makeVideo(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('video');
+    el.preload = 'auto'; el.playsInline = true; el.muted = true; el.crossOrigin = 'anonymous';
+    el.addEventListener('loadeddata', () => resolve(el), { once: true });
+    el.addEventListener('error', () => reject(new Error('video 로드 실패')), { once: true });
+    el.src = src;
+    el.load();
+  });
+}
+function seekTo(el, sec) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const fin = (ok) => {
+      if (done) return; done = true;
+      el.removeEventListener('seeked', on); el.removeEventListener('error', bad);
+      clearTimeout(timer); ok ? resolve() : reject(new Error('seek 실패'));
+    };
+    const on = () => fin(true); const bad = () => fin(false);
+    const timer = setTimeout(() => fin(false), 4000);
+    el.addEventListener('seeked', on); el.addEventListener('error', bad);
+    try { el.currentTime = sec; } catch { fin(false); }
+  });
+}
+async function videoSeekMs(el, ms) {
+  const t0 = performance.now();
+  try {
+    await seekTo(el, ms / 1000);
+    const bmp = await createImageBitmap(el);
+    const dt = performance.now() - t0;
+    bmp.close();
+    return dt;
+  } catch { return NaN; }
+}
+
+// ── 움직임 세 가지 ──────────────────────────────────────────────────────────
+function patterns(durationMs, frameMs) {
+  const rand = rng(4242);
+  const jump = [];
+  for (let i = 0; i < 50; i++) jump.push(Math.floor(rand() * Math.max(1, durationMs - 300)));
+  const fwd = [];
+  let t = durationMs * 0.1;
+  for (let i = 0; i < 60; i++) { fwd.push(Math.round(t)); t += frameMs; }
+  const back = [];
+  t = durationMs * 0.9;
+  for (let i = 0; i < 30; i++) { back.push(Math.round(t)); t -= frameMs; }
+  return { jump, fwd, back };
+}
+
+async function benchFile(label, src, durationMs, fps) {
+  const frameMs = 1000 / fps;
+  const pat = patterns(durationMs, frameMs);
+  const res = { label, src };
+
+  // 지금 경로
+  const el = await makeVideo(src);
+  for (const [name, list] of Object.entries(pat)) {
+    const ms = [];
+    for (const t of list) ms.push(await videoSeekMs(el, t));
+    res[`video_${name}`] = summarize(ms);
+  }
+  el.removeAttribute('src'); el.load();
+
+  // WebCodecs
+  const source = await createWebCodecsSource(src, { lookahead: 60 });
+  if (!source) { res.webcodecs = '열지 못함'; return res; }
+  // 시동(디코더 준비) 비용은 따로 잰다
+  const t0 = performance.now();
+  await source.frameAt(pat.jump[0]);
+  res.wc_startupMs = Math.round((performance.now() - t0) * 10) / 10;
+  for (const [name, list] of Object.entries(pat)) {
+    const dir = name === 'back' ? -1 : 1;
+    const ms = [];
+    for (const t of list) {
+      const s0 = performance.now();
+      source.hint(t, dir, 1);
+      const f = await source.frameAt(t);
+      ms.push(f ? performance.now() - s0 : NaN);
+    }
+    res[`wc_${name}`] = summarize(ms);
+  }
+  res.wc_stats = source.stats();
+  source.close();
+  res.wc_statsAfterClose = source.stats();
+  return res;
+}
+
+const FILES = [
+  ['프록시 GOP 기본 (540p60)', '/media/w8-f14/gtest/n95kzhiR45VuDLb1BdXJI.old.mp4', 5000, 60],
+  ['프록시 GOP 15 (540p60)', '/media/w8-f14/gtest/n95kzhiR45VuDLb1BdXJI.gplain.mp4', 5000, 60],
+  ['실제 프록시 (540p30)', '/media/proxies/05Za-VeBbHtGHMiFsSqRd.mp4', 5000, 30],
+  ['webm 스티커 vp9 alpha', '/media/assets/GCM0CJfPpWBWGs4qOTuY8.webm', 1000, 12],
+];
+
+for (const [label, src, dur, fps] of FILES) {
+  log(`▶ ${label}`);
+  const r = await benchFile(label, src, dur, fps);
+  out.push(r);
+  log(JSON.stringify(r));
+}
+
+window.__F14_BENCH2 = { results: out, mem: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null };
+document.title = 'F14 bench2 DONE';
+</script>

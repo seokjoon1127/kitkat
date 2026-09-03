@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.remotion/
+*.log
+
+# 아래 넷은 «최상위» 것만 무시한다. 앞의 / 가 없으면 아무 깊이의 같은 이름 폴더를
+# 다 잡는다 — 그러면 소스 코드인 packages/media/ 까지 통째로 빠진다.
+/media/
+/data/
+/vendor/
+
+packages/ai/.venv/
+packages/ai/models/

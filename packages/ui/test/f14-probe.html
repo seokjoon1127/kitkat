@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>F14 probe</title>
+<pre id="out">running…</pre>
+<script type="module">
+// F14 라이브러리 비교 실측 — mediabunny vs mp4box.
+// 「어떤 컨테이너/코덱이 열리는가」와 「첫 프레임까지 몇 ms 인가」를 잰다.
+import { Input, ALL_FORMATS, UrlSource, VideoSampleSink, canDecode } from 'mediabunny';
+import { createFile as mp4boxCreateFile, MP4BoxBuffer } from 'mp4box';
+
+const URLS = [
+  ['mp4 프록시(h264 540p)', '/media/proxies/05Za-VeBbHtGHMiFsSqRd.mp4'],
+  ['mp4 원본(h264 2160x3840)', '/media/assets/8vw1Mei6_cCf2pSqs8AQ6.mp4'],
+  ['mp4 원본(h264 1080x1920 60fps)', '/media/assets/n95kzhiR45VuDLb1BdXJI.mp4'],
+  ['webm 스티커(vp9 alpha)', '/media/assets/GCM0CJfPpWBWGs4qOTuY8.webm'],
+  ['webm alpha(합성)', '/media/w8-f14/alpha.webm'],
+  ['webm vp8', '/media/w8-f14/vp8.webm'],
+  ['mp4 hevc', '/media/w8-f14/hevc.mp4'],
+  ['mp4 av1', '/media/w8-f14/av1.mp4'],
+  ['mov prores', '/media/w8-f14/prores.mov'],
+];
+
+async function tryMediabunny(url) {
+  const r = { opened: false, codec: null, canDecode: null, firstFrameMs: null, err: null };
+  let input = null;
+  try {
+    input = new Input({ source: new UrlSource(url), formats: ALL_FORMATS });
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) throw new Error('비디오 트랙 없음');
+    r.opened = true;
+    r.codec = track.codec;
+    r.canDecode = await track.canDecode();
+    if (r.canDecode) {
+      const sink = new VideoSampleSink(track);
+      const t0 = performance.now();
+      const s = await sink.getSample(0.2);
+      r.firstFrameMs = Math.round((performance.now() - t0) * 10) / 10;
+      r.size = s ? `${s.displayWidth}x${s.displayHeight}` : null;
+      r.rotation = s ? track.rotation : null;
+      s?.close();
+    }
+  } catch (e) {
+    r.err = String(e && e.message ? e.message : e);
+  }
+  try { input?.dispose?.(); } catch { /* ignore */ }
+  return r;
+}
+
+function tryMp4box(url) {
+  return new Promise((resolve) => {
+    const r = { opened: false, codec: null, err: null };
+    const timer = setTimeout(() => { r.err = 'timeout(6s)'; resolve(r); }, 6000);
+    let file;
+    try { file = mp4boxCreateFile(); } catch (e) { clearTimeout(timer); resolve({ ...r, err: String(e) }); return; }
+    file.onError = (e) => { clearTimeout(timer); r.err = String(e); resolve(r); };
+    file.onReady = (info) => {
+      clearTimeout(timer);
+      const v = (info.videoTracks || [])[0];
+      r.opened = !!v;
+      r.codec = v ? v.codec : null;
+      if (!v) r.err = 'videoTracks 없음';
+      resolve(r);
+    };
+    fetch(url).then((res) => res.arrayBuffer()).then((buf) => {
+      const mb = new MP4BoxBuffer(buf.byteLength);
+      new Uint8Array(mb).set(new Uint8Array(buf));
+      mb.fileStart = 0;
+      file.appendBuffer(mb);
+      file.flush();
+      // onReady 가 안 오면 timeout 이 정리한다
+    }).catch((e) => { clearTimeout(timer); r.err = String(e); resolve(r); });
+  });
+}
+
+const results = [];
+for (const [label, url] of URLS) {
+  const mb = await tryMediabunny(url);
+  const mp = await tryMp4box(url);
+  results.push({ label, url, mediabunny: mb, mp4box: mp });
+  document.getElementById('out').textContent = JSON.stringify(results, null, 1);
+}
+window.__F14_PROBE = {
+  results,
+  videoDecoder: typeof VideoDecoder !== 'undefined',
+  decodableVideo: await (async () => { try { return await (await import('mediabunny')).getDecodableVideoCodecs(); } catch { return null; } })(),
+};
+document.title = 'F14 probe DONE';
+</script>
