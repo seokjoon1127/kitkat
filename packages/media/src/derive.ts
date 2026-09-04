@@ -361,7 +361,11 @@ export const VOICE_TRUE_PEAK_DB = -1.0;
  * 음악용 LRA(허용 음량 폭). **loudnorm 은 원본의 폭이 LRA 보다 넓으면 혼자 「동적 모드」로
  * 바꿔** 곡 안의 여린 데를 올리고 센 데를 눌러 평평하게 만든다. 목소리 프리셋 값(11·7)을
  * 음악에 그대로 주면 그 일이 벌어진다. 20 이면 대부분의 곡이 「상수 게인 1번」(linear)에
- * 머물러 음량만 바뀌고 셈여림은 그대로다.
+ * 머물러 음량만 바뀌고 셈여림은 그대로다 — 단, LRA 만으로 정해지는 게 아니다: 필요한
+ * 게인에 트루피크 여유가 없으면(예: I=-9,TP=-1.0,LRA=20 인 소스를 measured_I=-12,
+ * measured_TP=-0.5 로 올리는 경우) LRA 값과 무관하게 loudnorm 은 dynamic 으로 간다.
+ * 조용한 음악을 -14 쪽으로 «올릴» 때 걸릴 수 있는 얘기고, 흔한 경우인 -24 로 «내릴» 때는
+ * 해당 없다.
  */
 export const MUSIC_LRA = 20;
 
@@ -662,7 +666,10 @@ export async function deriveMedia(
       await runFfmpegProgress(measureArgs, info.durationMs, passProgress, { cwd: tmp });
       const raw = await readLoudnormStats(path.join(tmp, 'ln1.json'));
       // 거의 무음이면 input_i 가 -inf 로 나온다 → measured_* 에 넣으면 ffmpeg 이 죽는다.
-      // 그런 소스는 맞출 라우드니스가 없으므로 1패스(측정 없는 loudnorm)로 물러선다.
+      // 그런 소스는 맞출 라우드니스 자체가 없다 — measured 를 undefined 로 두면
+      // audioParts() 가 loudnorm 을 아예 안 붙인다(1패스로 물러서는 게 아니다).
+      // 여기서 억지로 측정 없는 loudnorm 을 넣으면 거의 무음인 신호를 큰 게인으로
+      // 증폭해 잡음만 커진다 — 「손대지 않는다」가 맞는 동작이다.
       measured = loudnormStatsUsable(raw) ? raw : undefined;
       endPass();
     }

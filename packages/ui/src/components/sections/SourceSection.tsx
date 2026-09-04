@@ -9,6 +9,7 @@ import {
   LOUDNESS_TARGETS,
   VOICE_PRESETS,
   loudnessTargetOf,
+  normalizeLoudness,
 } from '@kitkat/schema';
 import type { Asset, AudioClip, ClipSource, VideoClip, VoicePreset } from '@kitkat/schema';
 import { useEditor } from '../../state.js';
@@ -98,9 +99,12 @@ function VoiceGroup({
 }) {
   const voice = source.voice;
   const preset: VoicePreset = voice?.preset ?? 'off';
-  // 음량 맞춤은 프리셋과 «별개» 노브다 — 프리셋을 꺼도 음악 음량은 맞출 수 있어야 한다.
-  const loudnessOn = source.loudness != null;
-  const targetLufs = source.loudness?.targetLufs ?? DEFAULT_TARGET_LUFS;
+  // 화면이 엔진과 다른 말을 하지 않게 «같은 함수» 로 판단한다 (계획서 결정 3).
+  // 서버도 이걸 부른다 — 여기서 source.loudness 만 보면 목소리 프리셋이 켠 음량 맞춤이
+  // 화면에선 꺼진 것처럼 보인다. 옛 문서(voice.targetLufs)도 이 함수가 그대로 읽어 준다.
+  const effective = normalizeLoudness(source);
+  const loudnessOn = effective != null;
+  const targetLufs = effective?.targetLufs ?? DEFAULT_TARGET_LUFS;
   // 지금 값이 어느 프리셋인지. 프리셋에 없으면 undefined → 「직접 지정」으로 뜬다.
   const loudnessMatch = loudnessTargetOf(targetLufs);
   const measured = useVoiceMeasurement(clip);
@@ -152,11 +156,22 @@ function VoiceGroup({
       <CheckField
         label="음량 맞춤"
         checked={loudnessOn}
+        // 프리셋이 켜져 있으면 음량 맞춤은 이미 항상 켜진 상태다(normalizeLoudness) —
+        // 그래서 이 체크박스는 잠그고, 왜 잠겼는지는 바로 아래 문구로 설명한다.
+        disabled={preset !== 'off'}
         onCommit={(on) =>
           // 끌 때는 필드째 지운다 — 그래야 sourceKey 가 깨끗해지고 필요 없는 파생이 안 생긴다
           setSource({ ...source, loudness: on ? { targetLufs: DEFAULT_TARGET_LUFS } : undefined })
         }
       />
+      {preset !== 'off' ? (
+        <Row label="">
+          <span className="insp-static">
+            「목소리 다듬기」 프리셋을 쓰는 동안은 음량 맞춤이 함께 켜집니다 — 프리셋을 끄면
+            이 체크박스로 따로 켜고 끌 수 있습니다.
+          </span>
+        </Row>
+      ) : null}
       {loudnessOn ? (
         <>
           <SelectField
@@ -193,21 +208,23 @@ function VoiceGroup({
               </span>
             </Row>
           ) : null}
-          {measured ? (
-            <>
-              <Row label="측정 결과">
-                <span className="insp-static">
-                  {Number(measured.input_i).toFixed(1)} → {Number(measured.output_i).toFixed(1)} LUFS ·
-                  트루피크 {Number(measured.output_tp).toFixed(1)} dBTP · {measured.normalization_type}
-                </span>
-              </Row>
-              {dynamic ? (
-                <p className="insp-badge">
-                  목표 LRA 보다 원본 다이내믹이 좁아 dynamic 모드로 처리했습니다 (시간에 따라 게인을
-                  조절해 목표에 맞춥니다).
-                </p>
-              ) : null}
-            </>
+        </>
+      ) : null}
+      {/* 측정 결과는 «loudnorm 이 실제로 돌았는가» 로만 판단한다 — loudnessOn 이 아니다.
+          프리셋만으로 켜진 음량 맞춤도 loudnorm 은 똑같이 돈다(commands.ts:317-319). */}
+      {measured ? (
+        <>
+          <Row label="측정 결과">
+            <span className="insp-static">
+              {Number(measured.input_i).toFixed(1)} → {Number(measured.output_i).toFixed(1)} LUFS ·
+              트루피크 {Number(measured.output_tp).toFixed(1)} dBTP · {measured.normalization_type}
+            </span>
+          </Row>
+          {dynamic ? (
+            <p className="insp-badge">
+              목표 LRA 보다 원본 다이내믹이 좁아 dynamic 모드로 처리했습니다 (시간에 따라 게인을
+              조절해 목표에 맞춥니다).
+            </p>
           ) : null}
         </>
       ) : null}

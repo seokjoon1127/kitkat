@@ -59,7 +59,7 @@ export type LoudnessSpec = { targetLufs: number };
 |---|---|---|
 | 없음 | 없음 | 오디오를 안 건드린다 |
 | 없음 | `-24` | **새로 되는 것** — 음량만 −24 로. 음악용 |
-| `broadcast` | 없음 | 음색만 다듬는다. 음량은 원본 그대로 |
+| `broadcast` | 없음 | `normalizeLoudness()` 가 `voice.targetLufs` (없으면 기본 −14) 로 채워 넣는다 — **음색만 다듬고 음량은 그대로** 두는 조합은 없다. `loudness` 를 켜지 않아도 프리셋이 있으면 loudnorm 은 항상 돈다. 이 조합은 이번 분리 전에도(옛 `voice` 단일 필드 시절에도) 표현할 수 없었다 — 그때도 프리셋을 켜면 목표 LUFS 가 항상 같이 붙어 있었다. |
 | `broadcast` | `-16` | 다듬고 −16 으로. 이것도 새로 되는 것 (지금은 `voice.targetLufs` 로 묶여 있어 프리셋 없이는 못 쓴다) |
 
 ### 결정 2 — LRA 는 사용자 노브가 아니라 media 가 정한다
@@ -902,3 +902,5 @@ git commit -m "테스트: 음악에 음량만 맞추면 저음·고음이 같은
 ## 남기는 티켓
 
 - **트루피크가 목표별로 다르다.** `LOUDNESS_TARGETS.google-ads` 는 `truePeakDb: -2` 인데 `derive.ts` 는 `VOICE_TRUE_PEAK_DB = -1.0` 을 하드코딩한다. 광고 납품 규격을 골라도 트루피크는 −1 로 나간다. 별도로 고친다.
+- **LUT 부분강도 + 오디오 보정 = 오디오 보정이 조용히 버려진다.** `packages/media/src/derive.ts` 의 `needComplex && !useReverb` 분기는 영상을 `filter_complex` 로 만들고 오디오는 `-map 0:a?` 로 그냥 통과시킨다 — 그래서 `denoise` / 목소리 EQ / `pitch` / `loudness` 가 전부 무시되고, `loudness` 가 켜져 있으면 (아무 데도 안 쓰일) 측정 패스만 헛돈다. 이 문제 자체는 이 브랜치 전(base 커밋 `ea6c828`)에도 똑같이 있었던 것으로 확인했다 — 이번 브랜치는 `loudness` 를 `voice` 밖으로 꺼내면서 걸릴 수 있는 조합을 넓혔을 뿐이다. 고칠 방향: 그 분기에서도 그래프에 `link('0:a', audioParts(), 'aout', true)` 를 같이 넣고 `[aout]` 을 매핑한다.
+- **`MUSIC_LRA = 20` 을 검증하는 테스트가 없다.** 지금 `music` 픽스처는 `input_lra ≈ 0` 으로 측정돼서, 목표 LRA 를 20 으로 주든 목소리 프리셋 값(7·11)으로 주든 `normalization_type` 은 어차피 `linear` 다 — 그래서 `MUSIC_LRA` 를 실수로 목소리 값으로 되돌려도 지금 테스트 스위트는 그대로 초록이다(반면 `derive.ts` 의 주석은 그러면 음악이 평평해질 거라고 말한다). 검증하려면 LRA 가 11 보다 넓은 픽스처(느린 볼륨 엔벌로프, 12초 이상)가 필요하고, 그러면 그 테스트만 약 3배 느려진다.

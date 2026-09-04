@@ -1,6 +1,6 @@
 // W3-C 인스펙터 순수 헬퍼 단위 테스트 (+ W5 X3-A 확장)
 import { describe, expect, it } from 'vitest';
-import { EFFECT_TYPES, sourceKey, TRANSITION_TYPES } from '@kitkat/schema';
+import { EFFECT_TYPES, sourceKey, TRANSITION_TYPES, normalizeLoudness } from '@kitkat/schema';
 import type { Asset, AudioClip, TextClip, VideoClip } from '@kitkat/schema';
 import {
   addCurvePoint,
@@ -372,6 +372,19 @@ describe('파생 미디어 대기 판정', () => {
   it('normalizeClipSource: loudness 가 없으면 생기지 않는다', () => {
     expect(normalizeClipSource({ denoise: { amount: 0.5 } })).toEqual({
       denoise: { amount: 0.5 },
+    });
+  });
+
+  // ── VoiceGroup 이 체크박스·목표 크기를 그리는 규칙 — normalizeLoudness 하나로 판단한다
+  // (계획서 결정 3). source.loudness 만 보면 프리셋만으로 켜진 음량 맞춤이 화면에서
+  // 꺼진 것처럼 보이는 버그가 재발한다.
+  it('normalizeLoudness: 프리셋만 있어도 화면은 켜짐·-14 를 보여준다', () => {
+    expect(normalizeLoudness({ voice: { preset: 'broadcast' } })).toEqual({ targetLufs: -14 });
+  });
+
+  it('normalizeLoudness: 옛 문서의 voice.targetLufs 도 그대로 보여준다', () => {
+    expect(normalizeLoudness({ voice: { preset: 'broadcast', targetLufs: -16 } })).toEqual({
+      targetLufs: -16,
     });
   });
 });

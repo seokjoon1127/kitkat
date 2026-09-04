@@ -154,8 +154,10 @@ beforeAll(async () => {
     '-af', 'volume=-38dB', '-ar', '48000', '-c:a', 'pcm_s16le', quietTone,
   ]);
   music = path.join(srcDir, 'm.wav');
-  // 핑크 노이즈는 저음·고음이 둘 다 있다. 트레몰로로 셈여림을 줘야 loudnorm 이
-  // LRA 0 으로 떨어져 무조건 dynamic 이 되는 것을 피한다.
+  // 핑크 노이즈는 저음·고음이 둘 다 있다. 이 픽스처는 4초짜리라 loudnorm 의
+  // short-term 측정 창(3초)보다 짧아 LRA 는 실측으로도 ≈0 이 나온다(트레몰로는
+  // 파형은 흔들지만 LRA 에는 안 잡힌다) — 그리고 LRA 가 거의 0 이라야 linear 모드가
+  // 확실해진다(넓을수록 dynamic 으로 갈 여지가 생긴다).
   await execa('ffmpeg', [
     '-y', '-v', 'error',
     '-f', 'lavfi', '-i', 'anoisesrc=color=pink:duration=4:amplitude=0.3:seed=11',

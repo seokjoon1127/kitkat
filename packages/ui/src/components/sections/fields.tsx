@@ -211,10 +211,12 @@ export function CheckField({
   label,
   checked,
   onCommit,
+  disabled,
 }: {
   label: string;
   checked: boolean;
   onCommit: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <Row label={label}>
@@ -222,6 +224,7 @@ export function CheckField({
         className="insp-check"
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onCommit(e.target.checked)}
       />
     </Row>
