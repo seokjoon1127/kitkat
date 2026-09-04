@@ -186,24 +186,37 @@ describe('scheduleDeriveJobs — W8 S3 배선', () => {
     expect(spec.motionBlur).toEqual(source.motionBlur);
   });
 
-  it('voice 는 targetLufs 기본 -14 를 채워서 넘긴다', async () => {
+  it('voice 는 loudness.targetLufs 기본 -14 를 별개 필드로 채워서 넘긴다', async () => {
     const { key } = await setup({ voice: { preset: 'broadcast' } });
     await waitFor(() => h.calls.some((c) => c.key === key), 'derive 호출');
-    expect(h.calls.find((c) => c.key === key)!.spec.voice).toEqual({ preset: 'broadcast', targetLufs: -14 });
+    const spec = h.calls.find((c) => c.key === key)!.spec;
+    expect(spec.voice).toEqual({ preset: 'broadcast' });
+    expect(spec.loudness).toEqual({ targetLufs: -14 });
   });
 
-  it('voice.targetLufs 를 적으면 그 값이 간다 (몰래 바꾸지 않는다)', async () => {
+  it('voice.targetLufs 를 적으면 그 값이 loudness 로 간다 (몰래 바꾸지 않는다)', async () => {
     const { key } = await setup({ voice: { preset: 'podcast', targetLufs: -20 } });
     await waitFor(() => h.calls.some((c) => c.key === key), 'derive 호출');
-    expect(h.calls.find((c) => c.key === key)!.spec.voice).toEqual({ preset: 'podcast', targetLufs: -20 });
+    const spec = h.calls.find((c) => c.key === key)!.spec;
+    expect(spec.voice).toEqual({ preset: 'podcast' });
+    expect(spec.loudness).toEqual({ targetLufs: -20 });
   });
 
-  it("voice preset:'off' 는 스펙에 안 들어간다", async () => {
+  it("voice preset:'off' 는 스펙에 안 들어간다 (loudness 도 없으면 안 채워진다)", async () => {
     const { key } = await setup({ voice: { preset: 'off' }, denoise: { amount: 0.3 } });
     await waitFor(() => h.calls.some((c) => c.key === key), 'derive 호출');
     const spec = h.calls.find((c) => c.key === key)!.spec;
     expect(spec.voice).toBeUndefined();
+    expect(spec.loudness).toBeUndefined();
     expect(spec.denoise).toEqual({ amount: 0.3 });
+  });
+
+  it("voice preset:'off' 여도 loudness 가 있으면 음악 음량만 맞춘다", async () => {
+    const { key } = await setup({ voice: { preset: 'off' }, loudness: { targetLufs: -24 } });
+    await waitFor(() => h.calls.some((c) => c.key === key), 'derive 호출');
+    const spec = h.calls.find((c) => c.key === key)!.spec;
+    expect(spec.voice).toBeUndefined();
+    expect(spec.loudness).toEqual({ targetLufs: -24 });
   });
 
   it('matchTo 에 levels 가 «없으면» 잡을 등록하지 않는다 (측정은 F4 담당)', async () => {
@@ -271,7 +284,7 @@ describe('scheduleDeriveJobs — W8 S3 배선', () => {
     const { key } = await setup({ voice: { preset: 'broadcast', reverb: { irId: 'voxengo/room-small', wet: 0.4 } } });
     await waitFor(() => h.calls.some((c) => c.key === key), 'derive 호출');
     expect(h.calls.find((c) => c.key === key)!.spec.voice).toEqual({
-      preset: 'broadcast', targetLufs: -14, reverb: { irAbs: h.irPath, wet: 0.4 },
+      preset: 'broadcast', reverb: { irAbs: h.irPath, wet: 0.4 },
     });
   });
 

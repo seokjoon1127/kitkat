@@ -5,8 +5,8 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { findClip, type Command } from '@kitkat/engine';
 import {
-  DEFAULT_TARGET_LUFS,
   newId,
+  normalizeLoudness,
   sourceKey,
   type AudioClipSource,
   type ClipSource,
@@ -140,12 +140,14 @@ async function fillSourceSpec(
   if (source.hueSat && source.hueSat.length > 0) spec.hueSat = source.hueSat;
   if (source.hsl && source.hsl.length > 0) spec.hsl = source.hsl;
   if (source.motionBlur) spec.motionBlur = source.motionBlur;
+  // 음량 맞춤은 voice 와 «별개» 로 채운다 — 프리셋을 꺼도(off) loudness 가 있으면 맞춘다.
+  // 옛 문서의 voice.targetLufs 도 여기서 흡수한다(normalizeLoudness 한 곳에서만 판단).
+  const loud = normalizeLoudness(source);
+  if (loud) spec.loudness = { targetLufs: loud.targetLufs };
+
   if (source.voice && source.voice.preset !== 'off') {
     const v = source.voice;
-    spec.voice = {
-      preset: v.preset as VoicePresetId,
-      targetLufs: v.targetLufs ?? DEFAULT_TARGET_LUFS,
-    };
+    spec.voice = { preset: v.preset as VoicePresetId };
     if (v.reverb) {
       // IR 은 vendor/ir/ 에 있다 (scripts/prewarm.mjs voice-ir). 없으면 «조용히 건너뛰지 않고»
       // 잡을 실패시킨다 — 리버브를 켰는데 아무 일도 안 일어나는 것이 제일 나쁘다.
