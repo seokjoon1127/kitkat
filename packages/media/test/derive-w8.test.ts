@@ -9,10 +9,12 @@ import path from 'node:path';
 import {
   deriveMedia,
   estimateMotionBlurSeconds,
+  loudnessLra,
   matchColorLevels,
   videoFilterChain,
   voiceChain,
   voiceLra,
+  MUSIC_LRA,
   type DeriveSpec,
   type MatchLevels,
 } from '../src/derive.js';
@@ -344,11 +346,23 @@ describe('voiceChain — alimiter 자동 레벨링 함정', () => {
   });
 });
 
+describe('loudnessLra — 음악에 목소리용 LRA 를 쓰면 안 된다', () => {
+  it('voice 가 있으면 프리셋 LRA 를 쓴다 — 컴프가 이미 폭을 좁혔으므로', () => {
+    expect(loudnessLra({ voice: { preset: 'broadcast' }, loudness: { targetLufs: -14 } })).toBe(11);
+    expect(loudnessLra({ voice: { preset: 'podcast' }, loudness: { targetLufs: -14 } })).toBe(7);
+  });
+
+  it('voice 가 없으면 음악용 20 — 좁게 주면 loudnorm 이 동적 모드로 바뀌어 곡을 평평하게 만든다', () => {
+    expect(loudnessLra({ loudness: { targetLufs: -24 } })).toBe(MUSIC_LRA);
+    expect(MUSIC_LRA).toBe(20);
+  });
+});
+
 describe('2패스 loudnorm', () => {
   it('audio 클립: 목표 -14 LUFS 에 ±0.5 안으로 앉고, 트루피크가 -1.0 dBTP 를 안 넘는다', async () => {
     const before = await loudness(narration);
     const r = await deriveMedia(narration, outDir, 'ln1', 'k1', {
-      voice: { preset: 'broadcast', targetLufs: -14 },
+      voice: { preset: 'broadcast' }, loudness: { targetLufs: -14 },
     }, { audioOnly: true });
     const after = await loudness(path.join(outDir, r.src));
     expect(before.lufs).toBeLessThan(-16);            // 출발점이 목표와 떨어져 있어야 의미가 있다
@@ -359,7 +373,7 @@ describe('2패스 loudnorm', () => {
 
   it('다른 목표(-20 LUFS)도 그 값에 앉는다 (목표를 몰래 바꾸지 않는다)', async () => {
     const r = await deriveMedia(narration, outDir, 'ln2', 'k2', {
-      voice: { preset: 'podcast', targetLufs: -20 },
+      voice: { preset: 'podcast' }, loudness: { targetLufs: -20 },
     }, { audioOnly: true });
     const after = await loudness(path.join(outDir, r.src));
     expect(Math.abs(after.lufs - -20)).toBeLessThanOrEqual(0.5);
@@ -396,7 +410,7 @@ describe('2패스 loudnorm', () => {
 
   it('출력 샘플레이트가 48000 이다 — 안 적으면 loudnorm 이 192kHz 로 뱉는다', async () => {
     const r = await deriveMedia(narration, outDir, 'ar1', 'k4', {
-      voice: { preset: 'warm', targetLufs: -14 },
+      voice: { preset: 'warm' }, loudness: { targetLufs: -14 },
     }, { audioOnly: true });
     const info = await ffprobeJson(path.join(outDir, r.src));
     const a = (info.streams ?? []).find((s) => s.codec_type === 'audio') as { sample_rate?: string } | undefined;
@@ -419,7 +433,7 @@ describe('2패스 loudnorm', () => {
 
   it('파생 파일 길이가 소스와 ±150ms 안이다 (편집이 어긋나면 안 된다)', async () => {
     const r = await deriveMedia(narration, outDir, 'len1', 'k5', {
-      voice: { preset: 'bright', targetLufs: -14 },
+      voice: { preset: 'bright' }, loudness: { targetLufs: -14 },
     }, { audioOnly: true });
     const info = await ffprobeJson(path.join(outDir, r.src));
     expect(Math.abs(Number(info.format?.duration) * 1000 - 4000)).toBeLessThanOrEqual(150);
@@ -461,10 +475,26 @@ describe('deriveMedia — W8 S3 필드', () => {
   }, T5);
 
   it('voice → 오디오·비디오 유지 + 48kHz + loudnorm 통계 반환', async () => {
-    const { r, info } = await check('w5', 'kvoice', { voice: { preset: 'broadcast', targetLufs: -14 } });
+    const { r, info } = await check('w5', 'kvoice', {
+      voice: { preset: 'broadcast' }, loudness: { targetLufs: -14 },
+    });
     const a = (info.streams ?? []).find((s) => s.codec_type === 'audio') as { sample_rate?: string } | undefined;
     expect(a?.sample_rate).toBe('48000');
     expect(r.loudnorm?.normalization_type).toBeDefined();
+  }, T5);
+
+  it('loudness 만 (voice 없이) → loudnorm 2패스가 돈다 — 이번에 고치는 핵심', async () => {
+    const { r, info } = await check('w6', 'kloud', { loudness: { targetLufs: -20 } });
+    const a = (info.streams ?? []).find((s) => s.codec_type === 'audio') as { sample_rate?: string } | undefined;
+    // loudnorm 은 트루피크 검출로 192kHz 로 업샘플한다 — 48000 이면 -ar 이 걸렸다는 뜻
+    expect(a?.sample_rate).toBe('48000');
+    expect(r.loudnorm?.normalization_type).toMatch(/^(linear|dynamic)$/);
+  }, T5);
+
+  it('voice 만 (loudness 없이) → 음색만 바뀌고 loudnorm 통계가 «없다»', async () => {
+    const r = await deriveMedia(vid, outDir, 'w7', 'kvonly', { voice: { preset: 'warm' } });
+    expect(r.src).toBe('derived/w7.kvonly.mp4');
+    expect(r.loudnorm).toBeUndefined();
   }, T5);
 
   it('색보정 5종 + LUT 을 한꺼번에 걸어도 한 패스다 (LUT 부분강도 = filter_complex 경로)', async () => {

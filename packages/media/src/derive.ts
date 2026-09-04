@@ -76,9 +76,11 @@ export type MotionBlurSpec = { shutterAngle: number; quality: 'fast' | 'precise'
 export type VoicePresetId = 'broadcast' | 'warm' | 'bright' | 'podcast';
 export type VoiceDeriveSpec = {
   preset: VoicePresetId;
-  targetLufs: number;                              // 기본 -14 (서버가 채워서 넘긴다)
   reverb?: { irAbs: string; wet: number };         // wet 0..1
 };
+
+/** 음량 맞춤. voice 와 «독립» 이다 — 목소리 프리셋 없이도 걸 수 있어야 한다. */
+export type LoudnessDeriveSpec = { targetLufs: number };
 
 export type DeriveSpec = {
   lut?: { cubeAbs: string; intensity: number };
@@ -91,6 +93,7 @@ export type DeriveSpec = {
   hsl?: HslSecondary[];
   motionBlur?: MotionBlurSpec;
   voice?: VoiceDeriveSpec;
+  loudness?: LoudnessDeriveSpec;   // 2패스 loudnorm. voice 뒤에 붙는다(체인 순서 맨 끝)
 };
 
 /** 2패스 loudnorm 이 stats_file 로 남기는 JSON (문자열 필드들 — ffmpeg 이 따옴표로 낸다). */
@@ -355,6 +358,24 @@ const VOICE_PRESETS: Record<VoicePresetId, VoiceParams> = {
 export const VOICE_TRUE_PEAK_DB = -1.0;
 
 /**
+ * 음악용 LRA(허용 음량 폭). **loudnorm 은 원본의 폭이 LRA 보다 넓으면 혼자 「동적 모드」로
+ * 바꿔** 곡 안의 여린 데를 올리고 센 데를 눌러 평평하게 만든다. 목소리 프리셋 값(11·7)을
+ * 음악에 그대로 주면 그 일이 벌어진다. 20 이면 대부분의 곡이 「상수 게인 1번」(linear)에
+ * 머물러 음량만 바뀌고 셈여림은 그대로다.
+ */
+export const MUSIC_LRA = 20;
+
+/**
+ * 어떤 LRA 로 맞출 것인가. **사용자 노브로 열지 않는다** — 틀리게 만지면 곡이 평평해지는데
+ * 화면에는 「음량을 맞췄다」고만 보여서 원인을 못 찾는다.
+ * voice 체인에는 acompressor 가 들어 있어 이미 폭이 좁혀졌으므로 프리셋 값이 맞고,
+ * voice 가 없으면 아무것도 안 좁혔으니 넉넉히 준다.
+ */
+export function loudnessLra(spec: DeriveSpec): number {
+  return spec.voice ? voiceLra(spec.voice.preset) : MUSIC_LRA;
+}
+
+/**
  * loudnorm 앞까지의 나레이션 체인 (highpass → deesser → EQ 4단 → comp → limiter).
  *
  * - **디에서가 컴프 «앞»** 이다. 뒤에 두면 치찰음의 순간 피크에 컴프가 반응해 문장 전체를
@@ -388,9 +409,9 @@ export function voiceLra(preset: VoicePresetId): number {
 }
 
 /** 1패스: 체인 «적용 후» 의 라우드니스를 잰다 (컴프·리미터가 라우드니스를 바꾸므로). */
-function loudnormMeasure(voice: VoiceDeriveSpec, statsName: string): string {
+function loudnormMeasure(targetLufs: number, lra: number, statsName: string): string {
   return (
-    `loudnorm=I=${num(voice.targetLufs)}:TP=${num(VOICE_TRUE_PEAK_DB)}:LRA=${voiceLra(voice.preset)}` +
+    `loudnorm=I=${num(targetLufs)}:TP=${num(VOICE_TRUE_PEAK_DB)}:LRA=${lra}` +
     `:print_format=json:stats_file=${statsName}`
   );
 }
@@ -409,9 +430,9 @@ export function loudnormStatsUsable(m: LoudnormStats): boolean {
 }
 
 /** 2패스: 1패스가 잰 값을 measured_* 로 넣는다. 출력 stats 도 남겨 normalization_type 을 읽는다. */
-function loudnormApply(voice: VoiceDeriveSpec, m: LoudnormStats, statsName: string): string {
+function loudnormApply(targetLufs: number, lra: number, m: LoudnormStats, statsName: string): string {
   return (
-    `loudnorm=I=${num(voice.targetLufs)}:TP=${num(VOICE_TRUE_PEAK_DB)}:LRA=${voiceLra(voice.preset)}` +
+    `loudnorm=I=${num(targetLufs)}:TP=${num(VOICE_TRUE_PEAK_DB)}:LRA=${lra}` +
     `:measured_I=${m.input_i}:measured_LRA=${m.input_lra}:measured_TP=${m.input_tp}` +
     `:measured_thresh=${m.input_thresh}:offset=${m.target_offset}` +
     `:print_format=json:stats_file=${statsName}`
@@ -544,7 +565,10 @@ export async function deriveMedia(
   const post = audioOnly ? [] : postLutFilters(spec, info.fps);
   // voice 는 오디오가 있을 때만 의미가 있다 — 없으면 loudnorm 패스도 돌지 않는다
   const voice = info.hasAudio ? spec.voice : undefined;
-  if (!useLut && !useStab && af == null && pre.length === 0 && post.length === 0) {
+  // 음량 맞춤은 voice 와 «독립» 이다. 목소리 프리셋 없이 음악에만 걸 수 있어야 한다.
+  const loudness = info.hasAudio ? spec.loudness : undefined;
+  const lra = loudnessLra(spec);
+  if (!useLut && !useStab && af == null && pre.length === 0 && post.length === 0 && spec.loudness == null) {
     throw new Error('빈 파생 스펙');
   }
 
@@ -564,12 +588,12 @@ export async function deriveMedia(
   let committed = false;
 
   // stabilize 단독(video)이면 vidstab 2패스째가 곧 최종 파일 — 불필요한 재인코딩 생략
-  const needStageB = audioOnly || useLut || af != null || pre.length > 0 || post.length > 0;
+  const needStageB = audioOnly || useLut || af != null || pre.length > 0 || post.length > 0 || loudness != null;
 
   // 가변 패스 수 — 배열에 넣은 만큼이 분모다
   const passPlan: string[] = [];
   if (useStab) passPlan.push('stabilize:detect', 'stabilize:apply');
-  if (voice) passPlan.push('voice:loudnorm-measure');
+  if (loudness) passPlan.push('loudnorm:measure');
   if (needStageB) passPlan.push('main');
   if (!audioOnly) passPlan.push('proxy');
   const passes = passPlan.length;
@@ -613,22 +637,23 @@ export async function deriveMedia(
     // ── 오디오 그래프 조립 (loudnorm 2패스 · 리버브) ──
     const useReverb = voice?.reverb != null;
     let measured: LoudnormStats | undefined;
-    if (voice) {
+    if (loudness) {
       // 1패스: «체인 적용 후» 를 잰다. 리버브도 라우드니스를 바꾸므로 리버브 뒤에서 잰다.
       const measureArgs = ['-y', '-i', stageSrc];
-      if (useReverb) measureArgs.push('-i', voice.reverb!.irAbs);
+      if (useReverb) measureArgs.push('-i', voice!.reverb!.irAbs);
       if (useReverb) {
         measureArgs.push(
           '-filter_complex',
           [
             link('0:a', [...(af ? [af] : []), 'aformat=channel_layouts=stereo'], 'dry', true),
-            `[dry][1:a]afir=dry=1:wet=${num(voice.reverb!.wet)}:irfmt=input:gtype=peak[rv]`,
-            link('rv', [loudnormMeasure(voice, 'ln1.json')], 'aout', true),
+            `[dry][1:a]afir=dry=1:wet=${num(voice!.reverb!.wet)}:irfmt=input:gtype=peak[rv]`,
+            link('rv', [loudnormMeasure(loudness.targetLufs, lra, 'ln1.json')], 'aout', true),
           ].join(';'),
           '-map', '[aout]',
         );
       } else {
-        measureArgs.push('-vn', '-af', [...(af ? [af] : []), loudnormMeasure(voice, 'ln1.json')].join(','));
+        measureArgs.push('-vn', '-af',
+          [...(af ? [af] : []), loudnormMeasure(loudness.targetLufs, lra, 'ln1.json')].join(','));
       }
       measureArgs.push('-f', 'null', '-');
       await runFfmpegProgress(measureArgs, info.durationMs, passProgress, { cwd: tmp });
@@ -642,12 +667,12 @@ export async function deriveMedia(
     /** 2패스 loudnorm 까지 붙인 오디오 필터 목록(체인 순서 그대로). */
     const audioParts = (): string[] => {
       const parts = af ? [af] : [];
-      if (voice && measured) parts.push(loudnormApply(voice, measured, 'ln2.json'));
+      if (loudness && measured) parts.push(loudnormApply(loudness.targetLufs, lra, measured, 'ln2.json'));
       return parts;
     };
     // loudnorm 은 트루피크 검출을 위해 내부에서 192kHz 로 업샘플한다 — 출력 샘플레이트를
     // 안 적으면 그대로 192kHz 로 인코딩되어 파일이 커지고 일부 플레이어가 못 읽는다.
-    const arArgs = voice ? ['-ar', '48000'] : [];
+    const arArgs = loudness ? ['-ar', '48000'] : [];
 
     if (audioOnly) {
       const args = ['-y', '-i', stageSrc];
@@ -658,7 +683,8 @@ export async function deriveMedia(
           [
             link('0:a', [...(af ? [af] : []), 'aformat=channel_layouts=stereo'], 'dry', true),
             `[dry][1:a]afir=dry=1:wet=${num(voice!.reverb!.wet)}:irfmt=input:gtype=peak[rv]`,
-            link('rv', voice && measured ? [loudnormApply(voice, measured, 'ln2.json')] : [], 'aout', true),
+            link('rv', loudness && measured
+              ? [loudnormApply(loudness.targetLufs, lra, measured, 'ln2.json')] : [], 'aout', true),
           ].join(';'),
           '-map', '[aout]',
         );
@@ -668,7 +694,7 @@ export async function deriveMedia(
       args.push('-c:a', 'aac', '-b:a', '192k', ...arArgs, partOut);
       await runFfmpegProgress(args, info.durationMs, passProgress, { cwd: tmp });
       endPass();
-      const stats = voice ? await readLoudnormStats(path.join(tmp, 'ln2.json')).catch(() => undefined) : undefined;
+      const stats = loudness ? await readLoudnormStats(path.join(tmp, 'ln2.json')).catch(() => undefined) : undefined;
       await rename(partOut, outAbs);
       committed = true;
       return { src: rel, ...(stats ? { loudnorm: stats } : {}) };
@@ -677,7 +703,8 @@ export async function deriveMedia(
     if (needStageB) {
       if (useLut) await copyFile(spec.lut!.cubeAbs, path.join(tmp, 'lut.cube'));
       const lutBlend = useLut && spec.lut!.intensity < 0.999;
-      const applyAudio = af != null && info.hasAudio;
+      // af 가 없어도 loudnorm 만 붙는 경우가 있다(음악 음량 맞춤) — 목록이 비었는지로 판정한다
+      const applyAudio = info.hasAudio && audioParts().length > 0;
       // 두 입력이 필요한 리버브, 그리고 split/blend 가 필요한 LUT 부분강도만 filter_complex 다.
       const needComplex = lutBlend || useReverb;
 
@@ -704,7 +731,8 @@ export async function deriveMedia(
                 `[dry][1:a]afir=dry=1:wet=${num(voice!.reverb!.wet)}:irfmt=input:gtype=peak[rv]`,
               );
               graphs.push(
-                link('rv', voice && measured ? [loudnormApply(voice, measured, 'ln2.json')] : [], 'aout', true),
+                link('rv', loudness && measured
+                  ? [loudnormApply(loudness.targetLufs, lra, measured, 'ln2.json')] : [], 'aout', true),
               );
             }
             args.push('-filter_complex', graphs.join(';'), '-map', '[v]');
@@ -726,7 +754,7 @@ export async function deriveMedia(
       endPass();
     }
 
-    const stats = voice
+    const stats = loudness
       ? await readLoudnormStats(path.join(tmp, 'ln2.json')).catch(() => undefined)
       : undefined;
 

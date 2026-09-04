@@ -22,6 +22,7 @@ export {
   upscaleVideo as upscaleVideoLanczos, interpolateFps as interpolateFpsMinterpolate,
   audioFilterChain, videoFilterChain, matchColorLevels, voiceChain, voiceLra, voiceIrPath,
   estimateMotionBlurSeconds, MOTION_BLUR_SEC_PER_SEC, VOICE_TRUE_PEAK_DB,
+  MUSIC_LRA, loudnessLra,
 } from './derive.js';
 // W8 F1·F2 — AI 업스케일·보간 (기본 진입점). engine:'auto' 는 AI 가능하면 AI, 아니면 위 폴백.
 export {
@@ -38,7 +39,7 @@ export {
 export type { InterpEngine, InterpolateOpts, InterpolateResult } from './interpolate.js';
 export type {
   DeriveSpec, ChannelStat, MatchLevels, HslFamily, HslSecondary, HueSatBand,
-  LoudnormStats, MotionBlurSpec, VoiceDeriveSpec, VoicePresetId,
+  LoudnormStats, MotionBlurSpec, VoiceDeriveSpec, VoicePresetId, LoudnessDeriveSpec,
 } from './derive.js';
 export {
   clippedFraction, matchAffine, measureChannelHistograms, measureChannelStats,
