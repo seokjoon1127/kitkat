@@ -11,3 +11,6 @@ dist/
 
 packages/ai/.venv/
 packages/ai/models/
+
+# 임시 검증 스크립트 — 레포에 넣지 않는다
+.tmp-*

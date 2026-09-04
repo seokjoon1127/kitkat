@@ -15,10 +15,10 @@ kitkat 로컬 영상 편집 서버를 에이전트가 부릴 수 있게 하는 M
 claude mcp add kitkat -- node <절대경로>/packages/mcp/dist/index.js
 ```
 
-예 (Windows):
+예 (레포를 `C:/work/kitkat` 에 받았다면):
 
 ```sh
-claude mcp add kitkat -- node C:/Users/david/project/kitkat/packages/mcp/dist/index.js
+claude mcp add kitkat -- node C:/work/kitkat/packages/mcp/dist/index.js
 ```
 
 다른 주소의 서버를 쓰려면 환경변수를 얹는다:

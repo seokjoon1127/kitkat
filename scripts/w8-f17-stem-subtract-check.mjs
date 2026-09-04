@@ -12,6 +12,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { renderAudioStem, renderProject } from '@kitkat/renderer';
 import {
   canSubtractStems,
@@ -30,7 +31,8 @@ import {
 } from '../packages/server/dist/sidechain.js';
 
 const exec = promisify(execFile);
-const ROOT = path.resolve(process.argv[2] ?? 'C:/Users/david/project/kitkat');
+// 인자가 없으면 이 파일 위치를 기준으로 레포 뿌리를 찾는다
+const ROOT = path.resolve(process.argv[2] ?? fileURLToPath(new URL('..', import.meta.url)));
 const MEDIA = path.join(ROOT, 'media');
 const OUT = path.join(MEDIA, 'w8-f17-sub');
 rmSync(OUT, { recursive: true, force: true });

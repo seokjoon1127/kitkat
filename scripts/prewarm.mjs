@@ -26,7 +26,10 @@ if (mode === 'browser') {
     process.exit(1);
   }
   console.log('faster-whisper 준비 완료. speech.wav 전사(최초 실행 시 모델 다운로드)...');
-  const segs = await transcribe('C:/Users/david/project/kitkat/media/samples/speech.wav', { language: 'en' });
+  // 레포를 어디에 받아도 돌게 — 이 파일 위치를 기준으로 찾는다
+  const { fileURLToPath } = await import('node:url');
+  const sample = fileURLToPath(new URL('../media/samples/speech.wav', import.meta.url));
+  const segs = await transcribe(sample, { language: 'en' });
   console.log(`세그먼트 ${segs.length}개`);
   for (const s of segs) console.log(`  [${s.start}ms +${s.duration}ms] ${s.text} (words: ${s.words.length})`);
   if (segs.length === 0 || segs.every((s) => s.words.length === 0)) {
