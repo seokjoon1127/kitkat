@@ -338,6 +338,42 @@ describe('파생 미디어 대기 판정', () => {
       voice: { preset: 'warm', targetLufs: -9 },
     });
   });
+
+  // ── W8 F11-분리 음량 맞춤(loudness) — voice 와 별개 필드 ──
+  it('normalizeClipSource: loudness 는 그대로 살아남는다', () => {
+    expect(normalizeClipSource({ loudness: { targetLufs: -24 } })).toEqual({
+      loudness: { targetLufs: -24 },
+    });
+  });
+
+  it('normalizeClipSource: loudness 는 다른 필드가 섞여 있어도 안 사라진다', () => {
+    expect(
+      normalizeClipSource({
+        loudness: { targetLufs: -24 },
+        voice: { preset: 'podcast' },
+        denoise: { amount: 0.5 },
+      }),
+    ).toEqual({
+      loudness: { targetLufs: -24 },
+      voice: { preset: 'podcast' },
+      denoise: { amount: 0.5 },
+    });
+  });
+
+  it('normalizeClipSource: loudness.targetLufs 도 -30..-9 로 클램프', () => {
+    expect(normalizeClipSource({ loudness: { targetLufs: -50 } })).toEqual({
+      loudness: { targetLufs: -30 },
+    });
+    expect(normalizeClipSource({ loudness: { targetLufs: 0 } })).toEqual({
+      loudness: { targetLufs: -9 },
+    });
+  });
+
+  it('normalizeClipSource: loudness 가 없으면 생기지 않는다', () => {
+    expect(normalizeClipSource({ denoise: { amount: 0.5 } })).toEqual({
+      denoise: { amount: 0.5 },
+    });
+  });
 });
 
 describe('속도 램프 포인트 편집', () => {
