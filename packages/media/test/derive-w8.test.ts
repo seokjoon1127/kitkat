@@ -29,6 +29,7 @@ let vid: string;       // 1초 320x180 30fps + sine
 let tiny: string;      // 1초 160x120 30fps (precise 모션 블러용 — 8배 보간이라 작아야 한다)
 let narration: string; // 4초, 다이내믹이 있는 «말소리 비슷한» 신호
 let quietTone: string; // -38dB 사인 — alimiter 자동 레벨링 함정 재현용
+let music: string;     // 4초 스테레오 — 저음·고음이 둘 다 있는 「음악 비슷한」 신호
 let cubeAbs: string;   // 비항등 LUT (따뜻한 룩)
 
 const stat = (mean: number, std: number) => ({ mean, std });
@@ -95,6 +96,18 @@ async function loudness(file: string): Promise<{ lufs: number; tp: number; lra: 
   }
 }
 
+/** 한 대역만 남기고 평균 레벨(dB)을 잰다. 음색이 변했는지 보려면 대역별로 봐야 한다. */
+async function bandDb(file: string, filter: string): Promise<number> {
+  const { stderr } = await execa(
+    'ffmpeg',
+    ['-hide_banner', '-i', file, '-af', `${filter},volumedetect`, '-f', 'null', '-'],
+    { reject: false },
+  );
+  const m = /mean_volume: ([-\d.]+) dB/.exec(stderr);
+  if (!m) throw new Error(`volumedetect 를 못 읽었다: ${stderr.slice(-400)}`);
+  return Number(m[1]);
+}
+
 /** 필터 체인 하나를 걸어 PNG 한 장을 굽는다 (컬러바 + 그레이 램프). */
 async function bakeFrame(cwd: string, name: string, chain: string[]): Promise<string> {
   const out = path.join(cwd, name);
@@ -139,6 +152,15 @@ beforeAll(async () => {
     '-y', '-v', 'error',
     '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=3',
     '-af', 'volume=-38dB', '-ar', '48000', '-c:a', 'pcm_s16le', quietTone,
+  ]);
+  music = path.join(srcDir, 'm.wav');
+  // 핑크 노이즈는 저음·고음이 둘 다 있다. 트레몰로로 셈여림을 줘야 loudnorm 이
+  // LRA 0 으로 떨어져 무조건 dynamic 이 되는 것을 피한다.
+  await execa('ffmpeg', [
+    '-y', '-v', 'error',
+    '-f', 'lavfi', '-i', 'anoisesrc=color=pink:duration=4:amplitude=0.3:seed=11',
+    '-af', 'tremolo=f=0.25:d=0.6,volume=-6dB',
+    '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', music,
   ]);
 }, T);
 
@@ -594,4 +616,52 @@ describe('deriveMedia 프록시 — 키프레임 간격', () => {
     expect(flags.length).toBeGreaterThan(0);
     expect(keys).toBeGreaterThanOrEqual(Math.floor(flags.length / 15));
   }, T5);
+});
+
+// W8 S6 — 음악에 loudness 만 걸면 상수 게인 하나만 들어가야 한다. voice 프리셋을 걸면
+// 목소리용 필터 체인(80Hz 컷, 200/400Hz 깎기, 3.5k/10k 부스트)이 대역별로 다르게
+// 움직인다 — 그게 음색이 변했다는 뜻이고, 그래서 loudness 를 voice 와 독립시켰다.
+describe('음악 음량 맞춤 — 음량은 맞추고 음색은 안 건드린다 (2026-09-04 실측 근거)', () => {
+  const LOW = 'lowpass=f=200';
+  // 출력은 AAC 192k 로 물린다 — AAC LC 는 이 비트레이트에서 18kHz 위를 거의 버린다.
+  // highpass=f=6000 만 쓰면(=6kHz~24kHz Nyquist) 핑크 노이즈(1/f 파워)의 그 대역 에너지 중
+  // ln(24/18)/ln(24/6) ≈ 21% 가 «코덱이 버린 몫» 인데, 이걸 음량 처리 탓으로 잘못 잰다.
+  // 16kHz 에서 자르면 코덱이 버리는 옥타브를 측정에서 빼서 정직하게 잰다.
+  const HIGH = 'highpass=f=6000,lowpass=f=16000';
+
+  it('loudness 만 걸면 저음·고음이 «같은 양» 움직인다 = 상수 게인 하나', async () => {
+    const before = { low: await bandDb(music, LOW), high: await bandDb(music, HIGH) };
+    const r = await deriveMedia(music, outDir, 'mus1', 'kmusloud', { loudness: { targetLufs: -24 } },
+      { audioOnly: true });
+    const out = path.join(outDir, r.src);
+    const after = { low: await bandDb(out, LOW), high: await bandDb(out, HIGH) };
+
+    const dLow = after.low - before.low;
+    const dHigh = after.high - before.high;
+    // 상수 게인이면 두 대역이 똑같이 움직인다. 0.8dB 는 aac 인코딩 오차 여유다.
+    expect(Math.abs(dLow - dHigh)).toBeLessThan(0.8);
+
+    // 「상수 게인 하나」의 직접 증거 — 대역 측정과 달리 코덱·측정 방식에 흔들리지 않는다.
+    expect(r.loudnorm?.normalization_type).toBe('linear');
+
+    // 그리고 실제로 목표에 앉았는지 — 「안 건드렸다」가 아니라 「맞췄다」여야 한다
+    const l = await loudness(out);
+    expect(Math.abs(l.lufs - (-24))).toBeLessThan(1.0);
+  }, T5);
+
+  it('voice 프리셋을 음악에 걸면 저음이 «깎인다» — 이래서 분리했다', async () => {
+    const before = { low: await bandDb(music, LOW), high: await bandDb(music, HIGH) };
+    const r = await deriveMedia(music, outDir, 'mus2', 'kmusvoice',
+      { voice: { preset: 'broadcast' }, loudness: { targetLufs: -24 } }, { audioOnly: true });
+    const out = path.join(outDir, r.src);
+    const after = { low: await bandDb(out, LOW), high: await bandDb(out, HIGH) };
+
+    // 목소리 체인은 80Hz 아래를 자르고 200·400Hz 를 깎고 3.5k·10k 를 올린다.
+    // 두 대역의 움직임이 «다르다» = 음색이 변했다. 이 테스트가 실패하면 voiceChain 이 바뀐 것이다.
+    expect((after.low - before.low) - (after.high - before.high)).toBeLessThan(-3);
+  }, T5);
+
+  // 계획서 3번째 테스트("voice 없음 + loudness 없음 = 빈 파생 스펙")는 뺐다 — derive.ts:574 의
+  // 같은 조건(af==null && pre/post 없음 && loudness==null)을 기존 'w8'/'kempty' 테스트가
+  // 이미 커버한다. 소스만 다를 뿐(vid vs music) 코드 경로가 같아 중복이다.
 });
