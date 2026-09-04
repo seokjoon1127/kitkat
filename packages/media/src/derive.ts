@@ -563,12 +563,15 @@ export async function deriveMedia(
   const useStab = !audioOnly && spec.stabilize != null;
   const pre = audioOnly ? [] : preLutFilters(spec);
   const post = audioOnly ? [] : postLutFilters(spec, info.fps);
-  // voice 는 오디오가 있을 때만 의미가 있다 — 없으면 loudnorm 패스도 돌지 않는다
+  // voice·loudness 둘 다 오디오가 있을 때만 의미가 있다 — 없으면 loudnorm 패스도 돌지 않는다
   const voice = info.hasAudio ? spec.voice : undefined;
   // 음량 맞춤은 voice 와 «독립» 이다. 목소리 프리셋 없이 음악에만 걸 수 있어야 한다.
   const loudness = info.hasAudio ? spec.loudness : undefined;
   const lra = loudnessLra(spec);
-  if (!useLut && !useStab && af == null && pre.length === 0 && post.length === 0 && spec.loudness == null) {
+  // 오디오 없는 소스에 loudness 만 있으면 실제로 할 일이 없다 — 반드시 오디오로 게이트된
+  // loudness 를 봐야 한다(spec.loudness 를 그대로 보면 무음 소스에서 뒤 단계가 통째로
+  // 건너뛰어져 partOut 이 아예 안 만들어지고 ffmpeg 의 "No such file" 로 죽는다).
+  if (!useLut && !useStab && af == null && pre.length === 0 && post.length === 0 && loudness == null) {
     throw new Error('빈 파생 스펙');
   }
 
@@ -689,7 +692,10 @@ export async function deriveMedia(
           '-map', '[aout]',
         );
       } else {
-        args.push('-vn', '-af', audioParts().join(','));
+        // loudness 만 있고(af==null) 1패스 측정이 무음이라 물러섰으면(measured==undefined)
+        // audioParts() 가 빈 배열이다 — 그때 '-af' ''를 넘기면 ffmpeg 이 그 자리에서 죽는다.
+        const parts = audioParts();
+        args.push('-vn', ...(parts.length > 0 ? ['-af', parts.join(',')] : []));
       }
       args.push('-c:a', 'aac', '-b:a', '192k', ...arArgs, partOut);
       await runFfmpegProgress(args, info.durationMs, passProgress, { cwd: tmp });

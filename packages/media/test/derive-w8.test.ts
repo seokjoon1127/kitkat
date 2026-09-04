@@ -497,6 +497,24 @@ describe('deriveMedia — W8 S3 필드', () => {
     expect(r.loudnorm).toBeUndefined();
   }, T5);
 
+  it('audioOnly + loudness 만, 측정 불가(거의 무음) → 죽지 않고 1패스로 물러선다 (리뷰 F1)', async () => {
+    // af==null(voice 없음) 이고 1패스 측정이 -inf 라 물러서면(loudnormStatsUsable=false)
+    // audioParts() 가 빈 배열이 된다 — 그 상태로 '-af' '' 를 넘기면 ffmpeg 이 즉시 죽는다.
+    const d = await mkdtemp(path.join(tmpdir(), 'silence-'));
+    try {
+      const silent = path.join(d, 'silent.wav');
+      await execa('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi',
+        '-i', 'anullsrc=r=48000:cl=mono', '-t', '1', silent]);
+      const r = await deriveMedia(silent, outDir, 'w10', 'kquiet', {
+        loudness: { targetLufs: -24 },
+      }, { audioOnly: true });
+      expect(r.src).toBe('derived/w10.kquiet.m4a');
+      expect(r.loudnorm).toBeUndefined();   // 측정을 못 썼으니 2패스 stats 도 없다
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
+  }, T5);
+
   it('색보정 5종 + LUT 을 한꺼번에 걸어도 한 패스다 (LUT 부분강도 = filter_complex 경로)', async () => {
     await check('w6', 'kall', {
       matchTo: { levels: LEVELS, strength: 0.7 },
@@ -519,6 +537,15 @@ describe('deriveMedia — W8 S3 필드', () => {
 
   it('빈 spec 은 여전히 throw (새 필드가 빈 배열이어도)', async () => {
     await expect(deriveMedia(vid, outDir, 'w8', 'kempty', { hsl: [], hueSat: [] })).rejects.toThrow('빈 파생 스펙');
+  }, T);
+
+  it('오디오 없는 소스 + loudness 만 → 할 일이 없으므로 여전히 빈 파생 스펙 (리뷰 F2)', async () => {
+    // tiny 는 -an(오디오 트랙 없음) — loudness 는 오디오 게이트를 거치므로 undefined 가 되고
+    // 다른 필터도 없으니 정말로 할 일이 없다. spec.loudness 가 아니라 게이트된 값을 봐야
+    // «빈 파생 스펙» 을 내지, 안 그러면 뒤 단계가 통째로 건너뛰어 partOut 이 안 만들어진다.
+    await expect(
+      deriveMedia(tiny, outDir, 'w9', 'kloudna', { loudness: { targetLufs: -24 } }),
+    ).rejects.toThrow('빈 파생 스펙');
   }, T);
 });
 
