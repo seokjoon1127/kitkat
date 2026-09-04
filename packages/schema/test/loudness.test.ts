@@ -5,6 +5,7 @@ import {
   VoiceSchema,
   loudnessTarget,
   loudnessTargetOf,
+  normalizeLoudness,
 } from '../src/index.js';
 
 describe('LOUDNESS_TARGETS', () => {
@@ -60,5 +61,39 @@ describe('LOUDNESS_TARGETS', () => {
     // -14 가 둘(유튜브·스포티파이)이면 먼저 나오는 유튜브
     expect(loudnessTargetOf(-14)!.id).toBe('youtube');
     expect(loudnessTargetOf(-13)).toBeUndefined();
+  });
+});
+
+describe('normalizeLoudness — voice.targetLufs 를 쓰던 옛 문서 호환', () => {
+  it('loudness 가 있으면 그대로 쓴다', () => {
+    expect(normalizeLoudness({ loudness: { targetLufs: -24 } })).toEqual({ targetLufs: -24 });
+  });
+
+  it('loudness 가 없고 voice 가 켜져 있으면 voice.targetLufs 를 옮겨 온다', () => {
+    expect(normalizeLoudness({ voice: { preset: 'broadcast', targetLufs: -16 } }))
+      .toEqual({ targetLufs: -16 });
+  });
+
+  it('voice 만 있고 targetLufs 를 안 적었으면 기본값 -14', () => {
+    expect(normalizeLoudness({ voice: { preset: 'warm' } }))
+      .toEqual({ targetLufs: DEFAULT_TARGET_LUFS });
+  });
+
+  it("preset:'off' 는 음량도 안 맞춘다 — 옛 동작 그대로", () => {
+    expect(normalizeLoudness({ voice: { preset: 'off', targetLufs: -24 } })).toBeUndefined();
+  });
+
+  it("preset:'off' 여도 loudness 가 있으면 맞춘다 — 이것이 이번에 고치는 것", () => {
+    expect(normalizeLoudness({ voice: { preset: 'off' }, loudness: { targetLufs: -24 } }))
+      .toEqual({ targetLufs: -24 });
+  });
+
+  it('둘 다 있으면 loudness 가 이긴다', () => {
+    expect(normalizeLoudness({ voice: { preset: 'broadcast', targetLufs: -16 }, loudness: { targetLufs: -24 } }))
+      .toEqual({ targetLufs: -24 });
+  });
+
+  it('아무것도 없으면 undefined', () => {
+    expect(normalizeLoudness({})).toBeUndefined();
   });
 });

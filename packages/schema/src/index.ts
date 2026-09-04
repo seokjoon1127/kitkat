@@ -171,6 +171,7 @@ export type ClipSource = {
   hsl?: HslSecondary[];         // F5 secondary(selectivecolor)
   motionBlur?: MotionBlurSpec;  // F3 소스 모션 블러 (minterpolate/tmix)
   voice?: VoiceSpec;            // F11 나레이션 체인 (video 클립의 오디오에도 건다)
+  loudness?: LoudnessSpec;      // 음량 맞춤 (2패스 loudnorm) — voice 와 독립
 };
 
 // ── W8 S3 — F4 컷별 색 맞추기 ────────────────────────────────────────────
@@ -241,11 +242,23 @@ export type VoiceSpec = {
   reverb?: { irId: string; wet: number };   // wet 0..1 — vendor/ir/<irId>.wav
 };
 
+/**
+ * 음량 맞춤 (라우드니스 정규화). **`voice`(음색 손질) 와 별개다.**
+ *
+ * 목소리 프리셋을 켜지 않고도 걸 수 있어야 한다 — 배경음악에 `broadcast` 를 걸면
+ * 80Hz 아래가 잘리고 200·400Hz 가 깎여 저음이 −6.2dB 빠진다(2026-09-04 실측).
+ * 음악에 필요한 것은 EQ 를 «안 거는» 음량 맞춤이다.
+ */
+export type LoudnessSpec = {
+  targetLufs: number;   // -30..-9. LOUDNESS_TARGETS 에서 고르거나 직접 지정
+};
+
 /** audio 클립의 source — 나레이션은 대부분 audio 클립이라 voice 가 여기에도 있어야 한다. */
 export type AudioClipSource = {
   denoise?: { amount: number };
   pitch?: { semitones: number };
   voice?: VoiceSpec;
+  loudness?: LoudnessSpec;      // 음량 맞춤 (2패스 loudnorm) — voice 와 독립
 };
 
 // 속도 커브 (M6)
@@ -519,6 +532,11 @@ export const VoiceSchema = z.object({
   reverb: z.object({ irId: z.string().min(1), wet: ratio01 }).optional(),
 });
 
+/** -30..-9 LUFS. 트루피크(-1.0 dBTP)는 노브를 열지 않는다 — VOICE_TRUE_PEAK_DB 참조. */
+export const LoudnessSchema = z.object({
+  targetLufs: z.number().min(-30).max(-9),
+});
+
 export const ClipSourceSchema = z.object({
   lut: z.object({ assetId: z.string().min(1), intensity: ratio01 }).optional(),
   stabilize: z.object({ smoothing: z.number().int().min(1).max(100) }).optional(),
@@ -529,12 +547,14 @@ export const ClipSourceSchema = z.object({
   hsl: z.array(HslSecondarySchema).optional(),
   motionBlur: MotionBlurSchema.optional(),
   voice: VoiceSchema.optional(),
+  loudness: LoudnessSchema.optional(),
 });
 
 const AudioClipSourceSchema = z.object({
   denoise: z.object({ amount: ratio01 }).optional(),
   pitch: z.object({ semitones: z.number().min(-12).max(12) }).optional(),
   voice: VoiceSchema.optional(),
+  loudness: LoudnessSchema.optional(),
 });
 
 export const SpeedPointSchema = z.object({ u: ratio01, speed: z.number().min(0.1).max(100) });
@@ -903,7 +923,7 @@ export { createEmptyProject, newId } from './factory.js';
 export { findUnknownKeys, describeUnknownKeys } from './unknown-keys.js';
 export { PROXY_TAG, isCurrentProxy, staleProxyTargets, staleProxyCount, type StaleProxyTarget } from './proxy-version.js';
 export {
-  sourceKey, rampDurationMs, rampSegments, curvesToTables, DEFAULT_TARGET_LUFS,
+  sourceKey, rampDurationMs, rampSegments, curvesToTables, DEFAULT_TARGET_LUFS, normalizeLoudness,
   type RampSegment,
 } from './derive.js';
 export {

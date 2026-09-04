@@ -92,6 +92,8 @@ const MUTATIONS: Record<string, (s: ClipSource) => void> = {
   'voice.reverb 없음': (s) => { delete s.voice!.reverb; },
   'voice.reverb.irId': (s) => { s.voice!.reverb!.irId = 'voxengo/hall-large'; },
   'voice.reverb.wet': (s) => { s.voice!.reverb!.wet = 0.31; },
+  'loudness 추가': (s) => { s.loudness = { targetLufs: -24 }; },
+  'loudness.targetLufs': (s) => { s.loudness = { targetLufs: -16 }; },
 };
 
 // levels 의 12개 μ·σ 각각 — 하나라도 빠지면 「다시 잰 결과가 반영 안 됨」이 된다
@@ -302,5 +304,18 @@ describe('문서 전체 검증', () => {
       ],
     };
     expect(() => validateDoc(doc)).not.toThrow();
+  });
+});
+
+describe('loudness — 새 조각은 맨 뒤에만 붙는다', () => {
+  it('loudness 만 있어도 키가 나온다 — voice 없이 굽는 새 경우', () => {
+    const k = sourceKey(vclip({ loudness: { targetLufs: -24 } }));
+    expect(k).toMatch(/^s[0-9a-f]{8}$/);
+    expect(k).not.toBe(sourceKey(vclip({ loudness: { targetLufs: -23 } })));
+  });
+
+  it('voice.targetLufs 와 loudness.targetLufs 는 서로 다른 키다 (알고 가는 부작용)', () => {
+    expect(sourceKey(vclip({ voice: { preset: 'broadcast', targetLufs: -16 } })))
+      .not.toBe(sourceKey(vclip({ voice: { preset: 'broadcast' }, loudness: { targetLufs: -16 } })));
   });
 });

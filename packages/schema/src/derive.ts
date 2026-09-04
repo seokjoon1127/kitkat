@@ -2,7 +2,7 @@
 // renderer 와 server 가 똑같은 계산을 써야 하므로 schema 에 둔다.
 import type {
   AudioClip, AudioClipSource, ClipSource, ColorCurves, Crop, CurvePoint,
-  HslSecondary, HueSatBand, MatchLevels, MatchTo, MotionBlurSpec, SpeedPoint, VideoClip, VoiceSpec,
+  HslSecondary, HueSatBand, LoudnessSpec, MatchLevels, MatchTo, MotionBlurSpec, SpeedPoint, VideoClip, VoiceSpec,
 } from './index.js';
 
 export type RampSegment = {
@@ -83,8 +83,33 @@ function voicePart(v: VoiceSpec): string {
   return `voice=${v.preset},${lufs},${rv}`;
 }
 
+/** 음량 맞춤 조각. **`voicePart` 는 건드리지 않는다** — 기존 문서의 키를 지키려면
+ *  새 조각을 맨 뒤에 덧붙이는 수밖에 없다(이 파일 sourceKey 주석의 계약). */
+function loudnessPart(l: LoudnessSpec): string {
+  return `loud=${round4(l.targetLufs)}`;
+}
+
 /** 나레이션 기본 목표 라우드니스 (관행값 — 플랫폼 공식 문서로 확인된 값이 아니다). */
 export const DEFAULT_TARGET_LUFS = -14;
+
+/**
+ * 옛 문서 호환 — 「음량 맞춤」은 원래 `voice.targetLufs` 안에 갇혀 있었다.
+ * 그래서 프리셋을 끄면(`off`) 음량 맞춤까지 같이 꺼졌다. 이제 `loudness` 가 제자리다.
+ *
+ * 읽는 쪽은 여기 하나만 부른다 — 서버·UI·sourceKey 가 각자 규칙을 갖게 두면 갈린다.
+ * `off` 에서 undefined 를 내는 것은 «옛 동작을 그대로 두기» 위해서다: 옛 문서에서
+ * `preset:'off'` 는 「오디오를 건드리지 마라」였고, 그 문서를 열었다고 갑자기
+ * 음량이 바뀌면 안 된다. 새로 켜려면 `loudness` 를 명시해야 한다.
+ */
+export function normalizeLoudness(
+  src: { voice?: VoiceSpec; loudness?: LoudnessSpec },
+): LoudnessSpec | undefined {
+  if (src.loudness) return src.loudness;
+  if (src.voice && src.voice.preset !== 'off') {
+    return { targetLufs: src.voice.targetLufs ?? DEFAULT_TARGET_LUFS };
+  }
+  return undefined;
+}
 
 /**
  * ClipSource + reversed → 안정 키 "s" + FNV-1a 32bit hex(8자).
@@ -110,6 +135,7 @@ export function sourceKey(clip: VideoClip | AudioClip): string | null {
   if (src.hsl && src.hsl.length > 0) parts.push(hslPart(src.hsl));
   if (src.motionBlur) parts.push(motionBlurPart(src.motionBlur));
   if (src.voice) parts.push(voicePart(src.voice));
+  if (src.loudness) parts.push(loudnessPart(src.loudness));
   if (parts.length === 0) return null;
   let normalized = parts.join('|');
   if ('reversed' in clip && clip.reversed === true) normalized += '|rev';
