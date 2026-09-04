@@ -540,6 +540,9 @@ export function normalizeClipSource(src: ClipSource): ClipSource | null {
         : {}),
     };
   }
+  // 음량 맞춤(loudness) — voice 와 별개 필드. 여기 안 넣으면 setSource 가 만든 값을
+  // 이 함수가 새로 만드는 next 객체에 안 옮겨서, 체크박스를 켜자마자 조용히 지워진다.
+  if (src.loudness) next.loudness = { targetLufs: clamp(src.loudness.targetLufs, -30, -9) };
   return Object.keys(next).length > 0 ? next : null;
 }
 

@@ -1,6 +1,6 @@
 // 파생 미디어 섹션 (W5 M2) — clip.source 를 통째로 갈아끼운다.
 // video: LUT + 손떨림 보정 + 잡음 제거 + 피치 / audio: 잡음 제거 + 피치.
-// + W8 F11: 나레이션 오디오 체인(프리셋·목표 LUFS·공간감) — video·audio 양쪽에 둔다.
+// + W8 F11: 목소리 다듬기(프리셋·공간감) + 음량 맞춤(목표 LUFS) — 서로 «별개» 노브다.
 // 파생 파일은 서버가 ffmpeg 로 굽는다 — 다 굽기 전에는 미리보기·렌더가 원본을 쓴다.
 import { useState } from 'react';
 import {
@@ -98,7 +98,9 @@ function VoiceGroup({
 }) {
   const voice = source.voice;
   const preset: VoicePreset = voice?.preset ?? 'off';
-  const targetLufs = voice?.targetLufs ?? DEFAULT_TARGET_LUFS;
+  // 음량 맞춤은 프리셋과 «별개» 노브다 — 프리셋을 꺼도 음악 음량은 맞출 수 있어야 한다.
+  const loudnessOn = source.loudness != null;
+  const targetLufs = source.loudness?.targetLufs ?? DEFAULT_TARGET_LUFS;
   // 지금 값이 어느 프리셋인지. 프리셋에 없으면 undefined → 「직접 지정」으로 뜬다.
   const loudnessMatch = loudnessTargetOf(targetLufs);
   const measured = useVoiceMeasurement(clip);
@@ -107,7 +109,7 @@ function VoiceGroup({
   return (
     <>
       <SelectField
-        label="나레이션"
+        label="목소리 다듬기"
         value={preset}
         options={VOICE_PRESET_OPTIONS}
         onCommit={(v) =>
@@ -120,40 +122,6 @@ function VoiceGroup({
       />
       {preset !== 'off' ? (
         <>
-          <SelectField
-            label="내보낼 곳"
-            value={loudnessMatch?.id ?? CUSTOM_LUFS}
-            options={LUFS_OPTIONS}
-            onCommit={(v) => {
-              const t = LOUDNESS_TARGETS.find((x) => x.id === v);
-              if (!t) return; // «직접 지정» 은 슬라이더로만 바꾼다
-              setSource({ ...source, voice: { ...voice!, targetLufs: t.lufs } });
-            }}
-          />
-          <SliderField
-            label="목표 크기"
-            value={targetLufs}
-            min={-30}
-            max={-9}
-            step={0.5}
-            digits={1}
-            onCommit={(v) => setSource({ ...source, voice: { ...voice!, targetLufs: v } })}
-          />
-          <Row label="">
-            <span className="insp-static">
-              {loudnessMatch
-                ? `${loudnessMatch.official ? '공식 규격' : '공식 문서 없는 관행값'} · ${loudnessMatch.hint}`
-                : '프리셋에 없는 값입니다. 내보낼 곳의 규격을 확인하세요.'}
-            </span>
-          </Row>
-          {loudnessMatch?.id === 'youtube' ? (
-            <Row label="">
-              <span className="insp-static">
-                구글 광고(Campaign Manager 360 · Ad Manager · DV360)로 납품한다면 −24 LKFS 가
-                공식 규격입니다 — 지금 값은 10dB 큽니다.
-              </span>
-            </Row>
-          ) : null}
           <SelectField
             label="공간감"
             value={voice?.reverb?.irId ?? NONE}
@@ -178,6 +146,52 @@ function VoiceGroup({
                 setSource({ ...source, voice: { ...voice, reverb: { irId: voice.reverb!.irId, wet: v } } })
               }
             />
+          ) : null}
+        </>
+      ) : null}
+      <CheckField
+        label="음량 맞춤"
+        checked={loudnessOn}
+        onCommit={(on) =>
+          // 끌 때는 필드째 지운다 — 그래야 sourceKey 가 깨끗해지고 필요 없는 파생이 안 생긴다
+          setSource({ ...source, loudness: on ? { targetLufs: DEFAULT_TARGET_LUFS } : undefined })
+        }
+      />
+      {loudnessOn ? (
+        <>
+          <SelectField
+            label="내보낼 곳"
+            value={loudnessMatch?.id ?? CUSTOM_LUFS}
+            options={LUFS_OPTIONS}
+            onCommit={(v) => {
+              const t = LOUDNESS_TARGETS.find((x) => x.id === v);
+              if (!t) return; // «직접 지정» 은 슬라이더로만 바꾼다
+              setSource({ ...source, loudness: { targetLufs: t.lufs } });
+            }}
+          />
+          <SliderField
+            label="목표 크기"
+            value={targetLufs}
+            min={-30}
+            max={-9}
+            step={0.5}
+            digits={1}
+            onCommit={(v) => setSource({ ...source, loudness: { targetLufs: v } })}
+          />
+          <Row label="">
+            <span className="insp-static">
+              {loudnessMatch
+                ? `${loudnessMatch.official ? '공식 규격' : '공식 문서 없는 관행값'} · ${loudnessMatch.hint}`
+                : '프리셋에 없는 값입니다. 내보낼 곳의 규격을 확인하세요.'}
+            </span>
+          </Row>
+          {loudnessMatch?.id === 'youtube' ? (
+            <Row label="">
+              <span className="insp-static">
+                구글 광고(Campaign Manager 360 · Ad Manager · DV360)로 납품한다면 −24 LKFS 가
+                공식 규격입니다 — 지금 값은 10dB 큽니다.
+              </span>
+            </Row>
           ) : null}
           {measured ? (
             <>
